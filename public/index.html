@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>TicketGo — Premium Ticket Booking</title>
+  <meta name="description" content="TicketGo — discover and book tickets for concerts, sports, and events." />
+  <link rel="stylesheet" href="/css/style.css" />
+</head>
+<body>
+  <div class="home-wrapper">
+
+    <!-- Navbar -->
+    <nav class="navbar">
+      <a href="/" class="nav-brand">
+        <div class="nav-brand-icon">
+          <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+            <path d="M22 9V7a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v2a2 2 0 0 1 0 4v2a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-2a2 2 0 0 1 0-4z"/>
+          </svg>
+        </div>
+        <span class="nav-brand-name">TicketGo</span>
+      </a>
+      <div class="nav-actions" id="nav-actions">
+        <a href="/login.html"  class="btn-outline">Sign In</a>
+        <a href="/signup.html" class="btn-primary">Get Started</a>
+      </div>
+    </nav>
+
+    <!-- Hero -->
+    <section class="hero">
+      <div class="hero-badge">
+        <svg width="10" height="10" viewBox="0 0 10 10" fill="currentColor"><circle cx="5" cy="5" r="5"/></svg>
+        Live Events Platform
+      </div>
+      <h1>Book Tickets for<br /><span>Unforgettable</span> Experiences</h1>
+      <p>High-performance ticket booking built for massive crowds. Secure, fast, and fair — every seat, every time.</p>
+      <div class="hero-cta" id="hero-cta">
+        <a href="/signup.html" class="btn-hero">Get Started Free</a>
+        <a href="/login.html"  class="btn-hero-outline">Sign In</a>
+      </div>
+    </section>
+
+  </div>
+
+  <script src="/js/auth.js"></script>
+  <script>
+    initHome();
+  </script>
+</body>
+</html>

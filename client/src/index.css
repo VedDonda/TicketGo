@@ -1,0 +1,31 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg-dark:        #0d0d0f;
+  --bg-card:        #161619;
+  --bg-input:       #1e1e24;
+  --bg-input-focus: #252530;
+  --border:         #2a2a35;
+  --border-focus:   #5b5fc7;
+  --accent:         #5b5fc7;
+  --accent-hover:   #4a4eb8;
+  --accent-light:   rgba(91, 95, 199, 0.15);
+  --text-primary:   #f0f0f5;
+  --text-secondary: #8888a0;
+  --text-muted:     #55556a;
+  --error:          #e05c6a;
+  --success:        #4eca8b;
+  --radius:         12px;
+  --radius-sm:      8px;
+  --transition:     0.2s ease;
+}
+
+html, body, #root {
+  height: 100%;
+  font-family: 'Inter', sans-serif;
+  background: var(--bg-dark);
+  color: var(--text-primary);
+  -webkit-font-smoothing: antialiased;
+}

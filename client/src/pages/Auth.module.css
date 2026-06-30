@@ -1,0 +1,96 @@
+/* Shared styles for Login & Signup pages */
+
+.title {
+  font-size: 1.9rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin-bottom: 6px;
+  letter-spacing: -0.4px;
+}
+
+.subtitle {
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+  margin-bottom: 28px;
+}
+
+.roleLabel {
+  font-size: 0.78rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  color: var(--text-secondary);
+  margin-bottom: 10px;
+}
+
+/* Alert banner */
+.alert {
+  padding: 11px 16px;
+  border-radius: var(--radius-sm);
+  font-size: 0.85rem;
+  font-weight: 500;
+  margin-bottom: 18px;
+}
+.alert_err {
+  background: rgba(224,92,106,0.12);
+  color: var(--error);
+  border: 1px solid rgba(224,92,106,0.25);
+}
+.alert_ok {
+  background: rgba(78,202,139,0.12);
+  color: var(--success);
+  border: 1px solid rgba(78,202,139,0.25);
+}
+
+/* Submit button */
+.submitBtn {
+  width: 100%;
+  padding: 13px;
+  background: var(--accent);
+  color: #fff;
+  border: none;
+  border-radius: var(--radius-sm);
+  font-family: 'Inter', sans-serif;
+  font-size: 0.95rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  margin-top: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 46px;
+  letter-spacing: 0.2px;
+}
+.submitBtn:hover:not(:disabled) {
+  background: var(--accent-hover);
+  transform: translateY(-1px);
+  box-shadow: 0 6px 20px rgba(91,95,199,0.45);
+}
+.submitBtn:active  { transform: translateY(0); }
+.submitBtn:disabled { opacity: 0.65; cursor: not-allowed; }
+
+/* Spinner */
+.spinner {
+  width: 18px; height: 18px;
+  border: 2.5px solid rgba(255,255,255,0.3);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* Footer link */
+.footer {
+  text-align: center;
+  margin-top: 22px;
+  font-size: 0.86rem;
+  color: var(--text-secondary);
+}
+.link {
+  color: var(--accent);
+  text-decoration: none;
+  font-weight: 600;
+  transition: color 0.2s;
+}
+.link:hover { color: #8084e8; text-decoration: underline; }

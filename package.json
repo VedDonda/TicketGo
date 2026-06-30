@@ -4,6 +4,8 @@
   "description": "",
   "main": "index.js",
   "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "repository": {
@@ -19,6 +21,7 @@
   },
   "homepage": "https://github.com/VedDonda/TicketGo#readme",
   "dependencies": {
+    "bcryptjs": "^3.0.3",
     "bullmq": "^5.79.2",
     "cors": "^2.8.6",
     "dotenv": "^17.4.2",

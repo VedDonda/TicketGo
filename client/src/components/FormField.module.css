@@ -1,0 +1,65 @@
+.group {
+  margin-bottom: 18px;
+}
+
+.label {
+  display: block;
+  font-size: 0.825rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 7px;
+}
+
+.required { color: var(--accent); }
+
+.inputWrap { position: relative; }
+
+.input {
+  width: 100%;
+  padding: 12px 16px;
+  background: var(--bg-input);
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  font-family: 'Inter', sans-serif;
+  font-size: 0.9rem;
+  outline: none;
+  transition: all 0.2s ease;
+}
+.input::placeholder { color: var(--text-muted); }
+.input:focus {
+  border-color: var(--border-focus);
+  background: var(--bg-input-focus);
+  box-shadow: 0 0 0 3px rgba(91,95,199,0.15);
+}
+.inputError {
+  border-color: var(--error) !important;
+  box-shadow: 0 0 0 3px rgba(224,92,106,0.15) !important;
+}
+
+/* password field needs extra right padding for eye button */
+.inputWrap:has(.eyeBtn) .input {
+  padding-right: 44px;
+}
+
+.eyeBtn {
+  position: absolute;
+  right: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  padding: 2px;
+  transition: color 0.2s;
+}
+.eyeBtn:hover { color: var(--text-secondary); }
+
+.errorMsg {
+  font-size: 0.78rem;
+  color: var(--error);
+  margin-top: 5px;
+}
