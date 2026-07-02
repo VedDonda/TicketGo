@@ -1,8 +1,10 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { getToken } from './services/authService';
-import Login  from './pages/Login';
-import Signup from './pages/Signup';
-import Home   from './pages/Home';
+import Login        from './pages/Login';
+import Signup       from './pages/Signup';
+import Home         from './pages/Home';
+import CreateEvent  from './pages/CreateEvent';
+import EventDetail  from './pages/EventDetail';
 
 // Guard: redirect to /login if not authenticated
 function PrivateRoute({ children }) {
@@ -26,6 +28,12 @@ export default function App() {
         } />
         <Route path="/signup" element={
           <GuestRoute><Signup /></GuestRoute>
+        } />
+        <Route path="/events/create" element={
+          <PrivateRoute><CreateEvent /></PrivateRoute>
+        } />
+        <Route path="/events/:id" element={
+          <PrivateRoute><EventDetail /></PrivateRoute>
         } />
         {/* Fallback */}
         <Route path="*" element={<Navigate to="/" replace />} />

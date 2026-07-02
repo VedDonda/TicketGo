@@ -1,5 +1,4 @@
 import { useState } from 'react';
-import styles from './FormField.module.css';
 
 const EyeOpen = () => (
   <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24"
@@ -22,24 +21,28 @@ export default function FormField({ label, id, type = 'text', error, required, .
   const isPassword = type === 'password';
   const inputType  = isPassword && showPw ? 'text' : type;
 
+  const baseInputClass = "w-full px-4 py-3 bg-bg-input border-[1.5px] border-border rounded-sm text-text-primary font-inter text-[0.9rem] outline-none transition-all duration-200 placeholder:text-text-muted focus:border-border-focus focus:bg-bg-input-focus focus:shadow-[0_0_0_3px_rgba(91,95,199,0.15)]";
+  const errorInputClass = "!border-error !shadow-[0_0_0_3px_rgba(224,92,106,0.15)]";
+  const passwordPaddingClass = "pr-[44px]";
+
   return (
-    <div className={styles.group}>
-      <label htmlFor={id} className={styles.label}>
+    <div className="mb-[18px]">
+      <label htmlFor={id} className="block text-[0.825rem] font-semibold text-text-primary mb-[7px]">
         {label}
-        {required && <span className={styles.required}> *</span>}
+        {required && <span className="text-accent"> *</span>}
       </label>
 
-      <div className={styles.inputWrap}>
+      <div className="relative">
         <input
           id={id}
           type={inputType}
-          className={`${styles.input} ${error ? styles.inputError : ''}`}
+          className={`${baseInputClass} ${error ? errorInputClass : ''} ${isPassword ? passwordPaddingClass : ''}`}
           {...props}
         />
         {isPassword && (
           <button
             type="button"
-            className={styles.eyeBtn}
+            className="absolute right-3 top-1/2 -translate-y-1/2 bg-transparent border-none text-text-muted cursor-pointer flex items-center p-[2px] transition-colors duration-200 hover:text-text-secondary"
             onClick={() => setShowPw((v) => !v)}
             aria-label="Toggle password visibility"
           >
@@ -48,7 +51,7 @@ export default function FormField({ label, id, type = 'text', error, required, .
         )}
       </div>
 
-      {error && <p className={styles.errorMsg}>{error}</p>}
+      {error && <p className="text-[0.78rem] text-error mt-[5px]">{error}</p>}
     </div>
   );
 }
