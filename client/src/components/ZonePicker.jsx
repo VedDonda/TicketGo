@@ -2,11 +2,11 @@
  * ZonePicker.jsx — Zone selection UI for ZONED_CAPACITY events.
  *
  * Features:
- *  - Cards for each zone with live availableSeats from GET /zones
- *  - Qty stepper per zone (1–20 cap, capped by availableSeats)
- *  - Single active zone selection at a time
- *  - Live updates via Socket.IO `zone:update` events
- *  - "Reserve" sends POST /hold and notifies parent
+ * - Cards for each zone with live availableSeats from GET /zones
+ * - Qty stepper per zone (1–20 cap, capped by availableSeats)
+ * - Single active zone selection at a time
+ * - Live updates via Socket.IO `zone:update` events
+ * - "Reserve" sends POST /hold and notifies parent
  */
 
 import { useState, useEffect, useCallback } from 'react';
@@ -120,8 +120,7 @@ export default function ZonePicker({ eventId, socket, onHoldConfirmed }) {
 
       {/* ── Intro text ─────────────────────────────────────────────────── */}
       <p style={{ margin: '0 0 20px', color: '#8888a0', fontSize: '0.87rem' }}>
-        Select a zone and choose how many tickets you need. Your selection will be
-        held for <strong style={{ color: '#f0f0f5' }}>10 minutes</strong> while you complete checkout.
+        Select a zone and choose how many tickets you need.
       </p>
 
       {/* ── Zone cards ────────────────────────────────────────────────── */}
@@ -260,7 +259,7 @@ export default function ZonePicker({ eventId, socket, onHoldConfirmed }) {
                 transition: 'all 0.2s',
               }}
             >
-              {holding ? '⏳ Reserving…' : `🔒 Reserve ${qty} Ticket${qty > 1 ? 's' : ''}`}
+              {holding ? '⏳ Processing…' : 'Proceed to Pay'}
             </button>
           </div>
         </div>

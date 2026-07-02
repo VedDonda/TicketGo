@@ -27,10 +27,11 @@ const getIO = (req) => req.app.get('io');
 // ─── Helper: lazy-expire stale HELD tickets ───────────────────────────────────
 const releaseExpiredTickets = async (eventId) => {
   const now = new Date();
-  await Ticket.updateMany(
+  const result = await Ticket.updateMany(
     { event: eventId, status: 'HELD', heldUntil: { $lt: now } },
     { $set: { status: 'AVAILABLE', heldBy: null, heldUntil: null } }
   );
+  return result.modifiedCount; // how many were freed
 };
 
 // ─── Helper: lazy-expire stale ZonedHolds and restore Inventory ───────────────
@@ -73,6 +74,8 @@ const getSeats = async (req, res) => {
       if (!grouped[t.section][t.row]) grouped[t.section][t.row] = [];
       grouped[t.section][t.row].push({
         _id:        t._id,
+        section:    t.section,   // needed by client to construct the hold payload
+        row:        t.row,       // needed by client to construct the hold payload
         seatNumber: t.seatNumber,
         status:     t.status,
         price:      t.price,
@@ -150,6 +153,14 @@ const holdSeats = async (req, res) => {
     // ── RESERVED_SEATING path ─────────────────────────────────────────────────
     if (event.eventType === 'RESERVED_SEATING') {
       const { seats } = req.body;
+
+      // Release any stale holds before attempting to claim seats —
+      // prevents false 409s from expired-but-not-yet-cleaned-up HELD tickets
+      const freed = await releaseExpiredTickets(req.params.id);
+      if (freed > 0) {
+        // Notify all clients in the room so their seat maps refresh automatically
+        io?.to(room).emit('seat:released', { eventId: req.params.id });
+      }
 
       if (!Array.isArray(seats) || seats.length === 0) {
         return res.status(400).json({ success: false, message: 'seats array is required' });

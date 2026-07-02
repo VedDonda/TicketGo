@@ -2,11 +2,11 @@
  * SeatMap.jsx — Interactive seat grid for RESERVED_SEATING events.
  *
  * Features:
- *  - Renders all seats grouped by section → row
- *  - Colour-coded by status: AVAILABLE (green), HELD (amber), BOOKED (dark), SELECTED (purple)
- *  - Multi-select up to MAX_SEATS (20)
- *  - Live updates via Socket.IO `seat:update` / `seat:released` events
- *  - "Confirm & Hold" sends POST /hold and notifies parent
+ * - Renders all seats grouped by section → row
+ * - Colour-coded by status: AVAILABLE (green), HELD (amber), BOOKED (dark), SELECTED (purple)
+ * - Multi-select up to MAX_SEATS (20)
+ * - Live updates via Socket.IO `seat:update` / `seat:released` events
+ * - "Confirm & Hold" sends POST /hold and notifies parent
  */
 
 import { useState, useEffect, useCallback } from 'react';
@@ -321,7 +321,7 @@ export default function SeatMap({ eventId, socket, onHoldConfirmed }) {
             boxShadow: totalSelected > 0 ? '0 4px 20px rgba(91,95,199,0.35)' : 'none',
           }}
         >
-          {holding ? '⏳ Holding…' : `🔒 Hold ${totalSelected > 0 ? totalSelected + ' seat' + (totalSelected > 1 ? 's' : '') : 'Seats'} (10 min)`}
+          {holding ? '⏳ Processing…' : 'Proceed to Pay'}
         </button>
       </div>
     </div>
