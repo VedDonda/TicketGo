@@ -5,6 +5,8 @@ import Signup       from './pages/Signup';
 import Home         from './pages/Home';
 import CreateEvent  from './pages/CreateEvent';
 import EventDetail  from './pages/EventDetail';
+import BookingPage  from './pages/BookingPage';
+import ProfilePage  from './pages/ProfilePage';
 
 // Guard: redirect to /login if not authenticated
 function PrivateRoute({ children }) {
@@ -34,6 +36,12 @@ export default function App() {
         } />
         <Route path="/events/:id" element={
           <PrivateRoute><EventDetail /></PrivateRoute>
+        } />
+        <Route path="/events/:id/book" element={
+          <PrivateRoute><BookingPage /></PrivateRoute>
+        } />
+        <Route path="/profile" element={
+          <PrivateRoute><ProfilePage /></PrivateRoute>
         } />
         {/* Fallback */}
         <Route path="*" element={<Navigate to="/" replace />} />

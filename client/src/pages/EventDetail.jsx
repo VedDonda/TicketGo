@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { Link, useParams, useNavigate } from 'react-router-dom';
 import { getCurrentUser, clearSession } from '../services/authService';
 import { fetchEventById } from '../services/eventService';
-import BookingModal from '../components/BookingModal';
+import { fetchMyEventTickets } from '../services/userService';
 
 // ─── Icons ────────────────────────────────────────────────────────────────────
 const TicketIcon = () => (
@@ -65,7 +65,7 @@ export default function EventDetail() {
   const [event,           setEvent]           = useState(null);
   const [loading,         setLoading]         = useState(true);
   const [error,           setError]           = useState(null);
-  const [showBookingModal, setShowBookingModal] = useState(false);
+  const [myTickets,       setMyTickets]       = useState(null); // null = not loaded yet
 
   useEffect(() => {
     (async () => {
@@ -82,6 +82,16 @@ export default function EventDetail() {
     })();
   }, [id]);
 
+  // Load user's booked tickets for this event
+  useEffect(() => {
+    (async () => {
+      try {
+        const { ok, data } = await fetchMyEventTickets(id);
+        if (ok && data.success) setMyTickets(data.data);
+      } catch { /* silent */ }
+    })();
+  }, [id]);
+
   const handleLogout = () => { clearSession(); navigate('/login'); };
 
   const cs = event ? (CATEGORY_COLORS[event.category] || CATEGORY_COLORS.OTHER) : {};
@@ -90,8 +100,7 @@ export default function EventDetail() {
   if (loading) return (
     <div style={{ minHeight: '100vh', background: '#0d0d0f', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
       <div style={{ textAlign: 'center', color: '#8888a0' }}>
-        <div style={{ fontSize: '2rem', marginBottom: 16 }}>🎟️</div>
-        <p style={{ fontFamily: 'Inter, sans-serif' }}>Loading event…</p>
+        <p style={{ fontFamily: 'Inter, sans-serif' }}>Loading event...</p>
       </div>
     </div>
   );
@@ -100,11 +109,10 @@ export default function EventDetail() {
   if (error) return (
     <div style={{ minHeight: '100vh', background: '#0d0d0f', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'Inter, sans-serif' }}>
       <div style={{ textAlign: 'center' }}>
-        <div style={{ fontSize: '3rem', marginBottom: 16 }}>😕</div>
         <h2 style={{ color: '#f0f0f5', margin: '0 0 8px' }}>Event not found</h2>
         <p style={{ color: '#e05c6a', marginBottom: 24 }}>{error}</p>
         <Link to="/" style={{ padding: '10px 24px', background: '#5b5fc7', color: '#fff',
-          borderRadius: 8, textDecoration: 'none', fontWeight: 600 }}>← Back to Events</Link>
+          borderRadius: 8, textDecoration: 'none', fontWeight: 600 }}>Back to Events</Link>
       </div>
     </div>
   );
@@ -151,10 +159,13 @@ export default function EventDetail() {
           <span style={{ fontSize: '1.1rem', fontWeight: 800, color: '#f0f0f5' }}>TicketGo</span>
         </Link>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <div style={{ width: 30, height: 30, borderRadius: '50%', background: '#5b5fc7',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            fontWeight: 700, fontSize: '0.8rem', color: '#fff' }}>{initial}</div>
-          <span style={{ fontSize: '0.875rem', color: '#f0f0f5' }}>{user?.name}</span>
+          <Link to="/profile" style={{ display: 'flex', alignItems: 'center', gap: 6,
+            textDecoration: 'none', color: '#f0f0f5' }}>
+            <div style={{ width: 30, height: 30, borderRadius: '50%', background: '#5b5fc7',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              fontWeight: 700, fontSize: '0.8rem', color: '#fff' }}>{initial}</div>
+            <span style={{ fontSize: '0.875rem', color: '#f0f0f5' }}>{user?.name}</span>
+          </Link>
           <button onClick={handleLogout} style={{
             padding: '6px 14px', background: 'transparent', border: '1px solid #2a2a35',
             color: '#8888a0', borderRadius: 8, fontSize: '0.8rem', cursor: 'pointer', fontFamily: 'Inter,sans-serif',
@@ -176,9 +187,12 @@ export default function EventDetail() {
           <img src={event.imageUrl} alt={event.title}
             style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', opacity: 0.25 }} />
         ) : (
-          <span style={{ fontSize: '6rem', position: 'relative', filter: 'drop-shadow(0 0 40px rgba(255,255,255,0.1))' }}>
-            {CAT_EMOJI[event.category] || '🎟️'}
-          </span>
+          <div style={{ width: 80, height: 80, borderRadius: 16, background: '#1e1e28',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative' }}>
+            <span style={{ fontSize: '0.7rem', fontWeight: 700, color: '#5b5fc7', textTransform: 'uppercase', letterSpacing: '1px' }}>
+              {event.category}
+            </span>
+          </div>
         )}
 
         {/* Back link */}
@@ -218,7 +232,7 @@ export default function EventDetail() {
             <span style={{
               background: 'rgba(0,0,0,0.5)', border: '1px solid rgba(255,255,255,0.08)',
               color: '#8888a0', borderRadius: 20, fontSize: '0.72rem', fontWeight: 600, padding: '4px 12px',
-            }}>{event.eventType === 'RESERVED_SEATING' ? '💺 Reserved Seating' : '🟢 General Admission'}</span>
+            }}>{event.eventType === 'RESERVED_SEATING' ? 'Reserved Seating' : 'General Admission'}</span>
           </div>
 
           {/* Title */}
@@ -273,7 +287,7 @@ export default function EventDetail() {
                     <div>
                       <span style={{ fontWeight: 700, color: '#f0f0f5', fontSize: '0.9rem' }}>{sec.section}</span>
                       <span style={{ color: '#55556a', fontSize: '0.78rem', marginLeft: 10 }}>
-                        {sec.rows} rows × {sec.seatsPerRow} seats = {(sec.rows * sec.seatsPerRow).toLocaleString('en-IN')} seats
+                        {(sec.rows * sec.seatsPerRow).toLocaleString('en-IN')} seats
                       </span>
                     </div>
                     <span style={{
@@ -301,7 +315,7 @@ export default function EventDetail() {
                     <div>
                       <span style={{ fontWeight: 700, color: '#f0f0f5', fontSize: '0.9rem' }}>{zone.zoneName}</span>
                       <span style={{ color: '#55556a', fontSize: '0.78rem', marginLeft: 10 }}>
-                        {zone.totalSeats.toLocaleString('en-IN')} seats available
+                        {zone.totalSeats.toLocaleString('en-IN')} seats total
                       </span>
                     </div>
                     <span style={{
@@ -342,25 +356,78 @@ export default function EventDetail() {
               </div>
             </div>
 
+            {/* Your Tickets — show if user has bookings for this event */}
+            {myTickets?.hasBooking && myTickets.tickets?.length > 0 && (
+              <div style={{
+                marginTop: 16, padding: '14px 16px',
+                background: 'rgba(34,197,94,0.05)', border: '1px solid rgba(34,197,94,0.15)',
+                borderRadius: 10,
+              }}>
+                <div style={{
+                  display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                  marginBottom: 10,
+                }}>
+                  <span style={{ fontSize: '0.68rem', fontWeight: 700, color: '#22c55e',
+                    textTransform: 'uppercase', letterSpacing: '0.6px' }}>
+                    Your Tickets
+                  </span>
+                  <Link to="/profile" style={{
+                    fontSize: '0.72rem', color: '#8084e8', fontWeight: 600, textDecoration: 'none',
+                  }}>View all</Link>
+                </div>
+                {myTickets.tickets.slice(0, 3).map((t) => (
+                  <div key={t._id} style={{
+                    display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                    padding: '6px 0', borderBottom: '1px solid rgba(34,197,94,0.08)',
+                  }}>
+                    <span style={{ fontSize: '0.8rem', color: '#f0f0f5' }}>
+                      {t.section} · Row {t.row} · Seat {t.seatNumber}
+                    </span>
+                    <span style={{
+                      fontSize: '0.65rem', fontWeight: 700, color: '#22c55e',
+                      background: 'rgba(34,197,94,0.1)', borderRadius: 4, padding: '2px 7px',
+                    }}>Booked</span>
+                  </div>
+                ))}
+                {myTickets.tickets.length > 3 && (
+                  <div style={{ fontSize: '0.75rem', color: '#55556a', marginTop: 8 }}>
+                    +{myTickets.tickets.length - 3} more
+                  </div>
+                )}
+                <div style={{
+                  display: 'flex', justifyContent: 'space-between', marginTop: 10,
+                  paddingTop: 8, borderTop: '1px solid rgba(34,197,94,0.08)',
+                }}>
+                  <span style={{ fontSize: '0.78rem', color: '#55556a' }}>Total paid</span>
+                  <span style={{ fontSize: '0.9rem', fontWeight: 800, color: '#f0f0f5' }}>
+                    {formatPrice(myTickets.totalPrice)}
+                  </span>
+                </div>
+              </div>
+            )}
+
             {/* CTA Button */}
             <button
               id="book-ticket-btn"
-              onClick={() => setShowBookingModal(true)}
+              onClick={() => navigate(`/events/${id}/book`)}
               style={{
-                width: '100%', padding: '14px', background: '#5b5fc7', border: 'none',
+                width: '100%', padding: '14px',
+                background: myTickets?.hasBooking ? 'transparent' : '#5b5fc7',
+                border: myTickets?.hasBooking ? '1px solid #5b5fc7' : 'none',
                 borderRadius: 10, color: '#fff', fontSize: '1rem', fontWeight: 700,
                 cursor: 'pointer', fontFamily: 'Inter, sans-serif',
-                boxShadow: '0 4px 20px rgba(91,95,199,0.4)', transition: 'all 0.2s',
+                boxShadow: myTickets?.hasBooking ? 'none' : '0 4px 20px rgba(91,95,199,0.4)',
+                transition: 'all 0.2s',
+                marginTop: 14,
               }}
-              onMouseEnter={e => { e.currentTarget.style.background = '#4a4eb8'; e.currentTarget.style.transform = 'translateY(-1px)'; }}
-              onMouseLeave={e => { e.currentTarget.style.background = '#5b5fc7'; e.currentTarget.style.transform = 'translateY(0)'; }}
+              onMouseEnter={e => { e.currentTarget.style.background = '#4a4eb8'; e.currentTarget.style.border = '1px solid #4a4eb8'; }}
+              onMouseLeave={e => {
+                e.currentTarget.style.background = myTickets?.hasBooking ? 'transparent' : '#5b5fc7';
+                e.currentTarget.style.border = myTickets?.hasBooking ? '1px solid #5b5fc7' : 'none';
+              }}
             >
-              🎟️ Book Tickets
+              {myTickets?.hasBooking ? 'Book More Tickets' : 'Book Tickets'}
             </button>
-
-            <p style={{ margin: '12px 0 0', textAlign: 'center', fontSize: '0.75rem', color: '#55556a' }}>
-              Secure checkout · Instant confirmation
-            </p>
 
             {/* Capacity info */}
             <div style={{
@@ -373,35 +440,13 @@ export default function EventDetail() {
             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', marginTop: 8 }}>
               <span style={{ color: '#55556a' }}>Event type</span>
               <span style={{ color: '#f0f0f5', fontWeight: 600 }}>
-                {event.eventType === 'RESERVED_SEATING' ? '💺 Reserved' : '🟢 GA'}
+              {event.eventType === 'RESERVED_SEATING' ? 'Reserved' : 'General Admission'}
               </span>
             </div>
           </div>
 
-          {/* Share / Save (placeholder) */}
-          <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
-            {['🔗 Share', '❤️ Save'].map(label => (
-              <button key={label} onClick={() => {}} style={{
-                flex: 1, padding: '10px', background: 'transparent',
-                border: '1px solid #2a2a35', borderRadius: 8, color: '#8888a0',
-                fontSize: '0.82rem', cursor: 'pointer', fontFamily: 'Inter, sans-serif',
-                transition: 'all 0.15s',
-              }}
-                onMouseEnter={e => { e.currentTarget.style.borderColor = '#5b5fc7'; e.currentTarget.style.color = '#8084e8'; }}
-                onMouseLeave={e => { e.currentTarget.style.borderColor = '#2a2a35'; e.currentTarget.style.color = '#8888a0'; }}
-              >{label}</button>
-            ))}
-          </div>
         </div>
       </div>
-
-      {/* ── Booking Modal ───────────────────────────────────────────────── */}
-      {showBookingModal && (
-        <BookingModal
-          event={event}
-          onClose={() => setShowBookingModal(false)}
-        />
-      )}
 
     </div>
   );

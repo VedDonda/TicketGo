@@ -3,8 +3,9 @@ const cors = require('cors');
 const helmet = require('helmet');
 const path = require('path');
 
-const authRoutes = require('./src/routes/authRoutes');
+const authRoutes  = require('./src/routes/authRoutes');
 const eventRoutes = require('./src/routes/eventRoutes');
+const userRoutes  = require('./src/routes/userRoutes');
 
 const app = express();
 
@@ -18,8 +19,9 @@ app.use(express.urlencoded({ extended: false }));
 app.use(express.static(path.join(__dirname, 'public')));
 
 // API Routes
-app.use('/api/auth', authRoutes);
+app.use('/api/auth',   authRoutes);
 app.use('/api/events', eventRoutes);
+app.use('/api/users',  userRoutes);
 
 // 404 fallback for unknown API routes
 app.use((req, res) => {

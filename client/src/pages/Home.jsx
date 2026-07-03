@@ -55,18 +55,6 @@ const CATEGORY_COLORS = {
   OTHER:      { bg: 'rgba(107,114,128,0.12)',border: 'rgba(107,114,128,0.35)',text: '#9ca3af' },
 };
 
-const STATS = [
-  { value: '10K+', label: 'Events Hosted' },
-  { value: '2M+',  label: 'Tickets Sold' },
-  { value: '99.9%',label: 'Uptime SLA' },
-  { value: '<200ms',label: 'Avg Response' },
-];
-
-const HOW_IT_WORKS = [
-  { step: '01', title: 'Browse Events', desc: 'Discover concerts, sports, theatre and more — all in one place, updated live.' },
-  { step: '02', title: 'Pick Your Seat', desc: 'Choose your exact seat on the interactive map or grab general admission in seconds.' },
-  { step: '03', title: 'Secure Checkout', desc: 'Pay safely in one click. Your ticket lands instantly in your wallet.' },
-];
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -116,13 +104,9 @@ function EventCard({ event }) {
         position: 'relative',
         borderBottom: `1px solid ${cs.border}`,
       }}>
-        {event.imageUrl ? (
+        {event.imageUrl && (
           <img src={event.imageUrl} alt={event.title}
             style={{ width: '100%', height: '100%', objectFit: 'cover', position: 'absolute', inset: 0, opacity: 0.6 }} />
-        ) : (
-          <span style={{ fontSize: '2.8rem' }}>
-            {{ MUSIC:'🎵', SPORTS:'🏆', COMEDY:'😂', THEATRE:'🎭', CONFERENCE:'💼', OTHER:'🎪' }[event.category] || '🎟️'}
-          </span>
         )}
 
         {/* Category pill */}
@@ -140,7 +124,7 @@ function EventCard({ event }) {
           background: 'rgba(0,0,0,0.6)', border: '1px solid rgba(255,255,255,0.1)',
           color: '#8888a0', borderRadius: '20px',
           fontSize: '0.65rem', fontWeight: 600, padding: '3px 9px',
-        }}>{event.eventType === 'RESERVED_SEATING' ? '💺 Reserved' : '🟢 GA'}</span>
+        }}>{event.eventType === 'RESERVED_SEATING' ? 'Reserved' : 'General Admission'}</span>
       </div>
 
       {/* Card body */}
@@ -292,10 +276,12 @@ export default function Home() {
                   + Create Event
                 </Link>
               )}
-              <div style={{ width: 32, height: 32, borderRadius: '50%', background: '#5b5fc7',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                fontWeight: 700, fontSize: '0.85rem', color: '#fff' }}>{initial}</div>
-              <span style={{ fontSize: '0.875rem', color: '#f0f0f5', fontWeight: 500 }}>{user.name}</span>
+              <Link to="/profile" style={{ display: 'flex', alignItems: 'center', gap: '8px', textDecoration: 'none' }}>
+                <div style={{ width: 32, height: 32, borderRadius: '50%', background: '#5b5fc7',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  fontWeight: 700, fontSize: '0.85rem', color: '#fff' }}>{initial}</div>
+                <span style={{ fontSize: '0.875rem', color: '#f0f0f5', fontWeight: 500 }}>{user.name}</span>
+              </Link>
               <button onClick={handleLogout} style={{
                 padding: '7px 14px', background: 'transparent', border: '1px solid #2a2a35',
                 color: '#8888a0', borderRadius: '8px', fontSize: '0.82rem', cursor: 'pointer',
@@ -323,25 +309,12 @@ export default function Home() {
         padding: '80px 40px 60px', textAlign: 'center', position: 'relative', overflow: 'hidden',
         background: 'radial-gradient(ellipse 70% 50% at 50% 0%, rgba(91,95,199,0.2) 0%, transparent 65%)',
       }}>
-        <span className="fade-up" style={{
-          display: 'inline-flex', alignItems: 'center', gap: '8px',
-          padding: '5px 16px', background: 'rgba(91,95,199,0.12)',
-          border: '1px solid rgba(91,95,199,0.28)', borderRadius: '999px',
-          fontSize: '0.75rem', fontWeight: 700, color: '#8084e8',
-          textTransform: 'uppercase', letterSpacing: '0.8px', marginBottom: '24px',
-        }}>
-          <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#5b5fc7',
-            animation: 'pulseCustom 2s ease-in-out infinite', display: 'inline-block' }} />
-          Live Events Platform
-        </span>
-
         <h1 className="fade-up" style={{
-          fontSize: 'clamp(2.2rem,5vw,3.8rem)', fontWeight: 900,
-          letterSpacing: '-1.5px', lineHeight: 1.1, margin: '0 auto 20px',
-          maxWidth: '760px', animationDelay: '0.1s',
+          fontSize: 'clamp(2rem,4vw,3.2rem)', fontWeight: 800,
+          letterSpacing: '-1px', lineHeight: 1.1, margin: '0 auto 16px',
+          maxWidth: '700px', animationDelay: '0.1s', color: '#f0f0f5',
         }}>
-          Book Tickets for<br />
-          <span style={{ color: '#5b5fc7' }}>Unforgettable</span> Experiences
+          Book Tickets for Live Events
         </h1>
 
         <p className="fade-up" style={{
@@ -389,22 +362,6 @@ export default function Home() {
         </form>
       </section>
 
-      {/* ── Stats bar ────────────────────────────────────── */}
-      <div style={{
-        display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)',
-        gap: '1px', background: '#2a2a35',
-        borderTop: '1px solid #2a2a35', borderBottom: '1px solid #2a2a35',
-        margin: '0 0 48px',
-      }}>
-        {STATS.map(({ value, label }) => (
-          <div key={label} style={{
-            background: '#0d0d0f', padding: '22px', textAlign: 'center',
-          }}>
-            <div style={{ fontSize: '1.6rem', fontWeight: 800, color: '#5b5fc7', letterSpacing: '-0.5px' }}>{value}</div>
-            <div style={{ fontSize: '0.78rem', color: '#55556a', marginTop: '4px', fontWeight: 500 }}>{label}</div>
-          </div>
-        ))}
-      </div>
 
       {/* ── Events Feed ──────────────────────────────────── */}
       <section style={{ maxWidth: '1200px', margin: '0 auto', padding: '0 40px 80px' }}>
@@ -533,44 +490,6 @@ export default function Home() {
         )}
       </section>
 
-      {/* ── How It Works ─────────────────────────────────── */}
-      <section style={{
-        background: '#161619', borderTop: '1px solid #2a2a35', borderBottom: '1px solid #2a2a35',
-        padding: '64px 40px',
-      }}>
-        <div style={{ maxWidth: '1200px', margin: '0 auto' }}>
-          <div style={{ textAlign: 'center', marginBottom: '48px' }}>
-            <h2 style={{ margin: '0 0 10px', fontSize: '1.75rem', fontWeight: 800, letterSpacing: '-0.5px' }}>
-              How It Works
-            </h2>
-            <p style={{ color: '#55556a', fontSize: '0.9rem', margin: 0 }}>
-              Get from discovery to confirmed ticket in under 60 seconds.
-            </p>
-          </div>
-
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '24px' }}>
-            {HOW_IT_WORKS.map(({ step, title, desc }) => (
-              <div key={step} style={{
-                background: '#0d0d0f', border: '1px solid #2a2a35', borderRadius: '16px',
-                padding: '28px', transition: 'border-color 0.2s',
-              }}
-                onMouseEnter={e => e.currentTarget.style.borderColor = '#5b5fc7'}
-                onMouseLeave={e => e.currentTarget.style.borderColor = '#2a2a35'}
-              >
-                <div style={{
-                  width: 44, height: 44, background: 'rgba(91,95,199,0.15)',
-                  border: '1px solid rgba(91,95,199,0.3)', borderRadius: '12px',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  fontSize: '0.75rem', fontWeight: 800, color: '#8084e8',
-                  letterSpacing: '0.5px', marginBottom: '20px',
-                }}>{step}</div>
-                <h3 style={{ margin: '0 0 10px', fontSize: '1rem', fontWeight: 700 }}>{title}</h3>
-                <p style={{ margin: 0, color: '#55556a', fontSize: '0.875rem', lineHeight: 1.65 }}>{desc}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
 
       {/* ── Footer ───────────────────────────────────────── */}
       <footer style={{ padding: '32px 40px', borderTop: '1px solid #2a2a35', textAlign: 'center' }}>

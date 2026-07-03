@@ -7,6 +7,7 @@ const {
   holdSeats,
   releaseHold,
   confirmPurchase,
+  getMyTickets,
 } = require('../controllers/bookingController');
 const { protect, authorize } = require('../middleware/authMiddleware');
 
@@ -39,5 +40,8 @@ router.post('/:id/release', protect, releaseHold);
 
 // POST /api/events/:id/confirm → confirm purchase (stub — marks BOOKED permanently)
 router.post('/:id/confirm', protect, confirmPurchase);
+
+// GET  /api/events/:id/my-tickets → current user's booked tickets for this event
+router.get('/:id/my-tickets', protect, getMyTickets);
 
 module.exports = router;

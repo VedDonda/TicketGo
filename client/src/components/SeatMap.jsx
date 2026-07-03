@@ -167,8 +167,7 @@ export default function SeatMap({ eventId, socket, onHoldConfirmed }) {
   // ── Render ───────────────────────────────────────────────────────────────────
   if (loading) return (
     <div style={{ textAlign: 'center', padding: '60px 20px', color: '#8888a0' }}>
-      <div style={{ fontSize: '2rem', marginBottom: 12 }}>🗺️</div>
-      <p style={{ fontFamily: 'Inter, sans-serif' }}>Loading seat map…</p>
+      <p style={{ fontFamily: 'Inter, sans-serif' }}>Loading seat map...</p>
     </div>
   );
 
@@ -298,7 +297,7 @@ export default function SeatMap({ eventId, socket, onHoldConfirmed }) {
             </>
           ) : (
             <p style={{ margin: 0, color: '#55556a', fontSize: '0.85rem' }}>
-              Click seats above to select them (max {MAX_SEATS})
+              Select seats (max {MAX_SEATS})
             </p>
           )}
           {holdError && (
@@ -321,7 +320,7 @@ export default function SeatMap({ eventId, socket, onHoldConfirmed }) {
             boxShadow: totalSelected > 0 ? '0 4px 20px rgba(91,95,199,0.35)' : 'none',
           }}
         >
-          {holding ? '⏳ Processing…' : 'Proceed to Pay'}
+          {holding ? 'Processing...' : 'Proceed to Pay'}
         </button>
       </div>
     </div>

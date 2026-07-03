@@ -251,73 +251,95 @@ const holdSeats = async (req, res) => {
 
     // ── ZONED_CAPACITY path ───────────────────────────────────────────────────
     if (event.eventType === 'ZONED_CAPACITY') {
-      const { zoneName, quantity } = req.body;
-      if (!zoneName || !quantity || quantity < 1) {
-        return res.status(400).json({ success: false, message: 'zoneName and quantity are required' });
+      // Accept either multi-zone array or legacy single-zone body
+      let zonesPayload = req.body.zones;
+      if (!zonesPayload && req.body.zoneName) {
+        zonesPayload = [{ zoneName: req.body.zoneName, quantity: req.body.quantity }];
       }
-      if (quantity > MAX_SEAT_SELECT) {
+      if (!Array.isArray(zonesPayload) || zonesPayload.length === 0) {
+        return res.status(400).json({ success: false, message: 'zones array is required' });
+      }
+
+      const totalQty = zonesPayload.reduce((s, z) => s + (z.quantity || 0), 0);
+      if (totalQty < 1) {
+        return res.status(400).json({ success: false, message: 'At least 1 ticket must be selected' });
+      }
+      if (totalQty > MAX_SEAT_SELECT) {
         return res.status(400).json({
           success: false,
-          message: `Cannot reserve more than ${MAX_SEAT_SELECT} tickets at once`,
+          message: `Cannot reserve more than ${MAX_SEAT_SELECT} tickets in one transaction`,
         });
       }
 
       await releaseExpiredZoneHolds(req.params.id);
 
-      // Release existing hold by this user on this event (if any)
-      const existingHold = await ZonedHold.findOneAndDelete({
-        event: req.params.id,
-        user:  req.user._id,
-      });
-      if (existingHold) {
+      // Release all existing holds by this user on this event
+      const existingHolds = await ZonedHold.find({ event: req.params.id, user: req.user._id });
+      for (const eh of existingHolds) {
         await Inventory.findOneAndUpdate(
-          { event: req.params.id, zoneName: existingHold.zoneName },
-          { $inc: { availableSeats: existingHold.quantity } }
+          { event: req.params.id, zoneName: eh.zoneName },
+          { $inc: { availableSeats: eh.quantity } }
         );
+        await ZonedHold.findByIdAndDelete(eh._id);
       }
 
-      // Atomically decrement availableSeats — only succeeds if enough remain
-      const inventory = await Inventory.findOneAndUpdate(
-        {
-          event:          req.params.id,
-          zoneName,
-          availableSeats: { $gte: quantity },
-        },
-        { $inc: { availableSeats: -quantity } },
-        { returnDocument: 'after' }
-      );
+      // Atomically decrement each zone — roll back if any fail
+      const decremented = [];
+      for (const { zoneName, quantity } of zonesPayload) {
+        if (!zoneName || !quantity || quantity < 1) continue;
+        const inv = await Inventory.findOneAndUpdate(
+          { event: req.params.id, zoneName, availableSeats: { $gte: quantity } },
+          { $inc: { availableSeats: -quantity } },
+          { returnDocument: 'after' }
+        );
+        if (!inv) {
+          // Roll back already decremented zones
+          for (const d of decremented) {
+            await Inventory.findOneAndUpdate(
+              { event: req.params.id, zoneName: d.zoneName },
+              { $inc: { availableSeats: d.quantity } }
+            );
+          }
+          return res.status(409).json({
+            success: false,
+            message: `Not enough seats available in zone "${zoneName}"`,
+          });
+        }
+        decremented.push({ zoneName, quantity, price: inv.price, availableSeats: inv.availableSeats });
+      }
 
-      if (!inventory) {
-        return res.status(409).json({
-          success: false,
-          message: 'Not enough seats available in this zone',
+      // Create one hold doc per zone
+      const holds = [];
+      for (const d of decremented) {
+        const h = await ZonedHold.create({
+          event:     req.params.id,
+          user:      req.user._id,
+          zoneName:  d.zoneName,
+          quantity:  d.quantity,
+          expiresAt,
+        });
+        holds.push(h);
+        io?.to(room).emit('zone:update', {
+          eventId:        req.params.id,
+          zoneName:       d.zoneName,
+          availableSeats: d.availableSeats,
         });
       }
 
-      const hold = await ZonedHold.create({
-        event:     req.params.id,
-        user:      req.user._id,
-        zoneName,
-        quantity,
-        expiresAt,
-      });
-
-      // Broadcast updated zone availability
-      io?.to(room).emit('zone:update', {
-        eventId:  req.params.id,
-        zoneName,
-        availableSeats: inventory.availableSeats,
-      });
+      const totalPrice = decremented.reduce((s, d) => s + d.price * d.quantity, 0);
 
       return res.status(200).json({
         success: true,
-        message: `${quantity} ticket(s) held in "${zoneName}" for ${HOLD_MINUTES} minutes`,
+        message: `${totalQty} ticket(s) held for ${HOLD_MINUTES} minutes`,
         data: {
-          holdId:    hold._id,
-          zoneName,
-          quantity,
-          price:     inventory.price,
-          totalPrice: inventory.price * quantity,
+          holds: holds.map((h, i) => ({
+            holdId:    h._id,
+            zoneName:  h.zoneName,
+            quantity:  h.quantity,
+            price:     decremented[i].price,
+            subtotal:  decremented[i].price * h.quantity,
+          })),
+          totalPrice,
           expiresAt,
         },
       });
@@ -359,33 +381,29 @@ const releaseHold = async (req, res) => {
     }
 
     if (event.eventType === 'ZONED_CAPACITY') {
-      const { holdId } = req.body;
-      const hold = await ZonedHold.findOne({
-        _id:   holdId,
-        event: req.params.id,
-        user:  req.user._id,
-      });
-
-      if (!hold) {
-        return res.status(404).json({ success: false, message: 'Hold not found or already expired' });
+      // Release all holds for this user on this event (multi-zone support)
+      const holds = await ZonedHold.find({ event: req.params.id, user: req.user._id });
+      if (holds.length === 0) {
+        return res.status(404).json({ success: false, message: 'No active holds found' });
       }
-
-      const inventory = await Inventory.findOneAndUpdate(
-        { event: req.params.id, zoneName: hold.zoneName },
-        { $inc: { availableSeats: hold.quantity } },
-        { returnDocument: 'after' }
-      );
-      await ZonedHold.findByIdAndDelete(hold._id);
-
-      io?.to(room).emit('zone:update', {
-        eventId:        req.params.id,
-        zoneName:       hold.zoneName,
-        availableSeats: inventory.availableSeats,
-      });
-
+      let totalReleased = 0;
+      for (const hold of holds) {
+        const inventory = await Inventory.findOneAndUpdate(
+          { event: req.params.id, zoneName: hold.zoneName },
+          { $inc: { availableSeats: hold.quantity } },
+          { returnDocument: 'after' }
+        );
+        await ZonedHold.findByIdAndDelete(hold._id);
+        totalReleased += hold.quantity;
+        io?.to(room).emit('zone:update', {
+          eventId:        req.params.id,
+          zoneName:       hold.zoneName,
+          availableSeats: inventory?.availableSeats ?? 0,
+        });
+      }
       return res.status(200).json({
         success: true,
-        message: `${hold.quantity} ticket(s) released from "${hold.zoneName}"`,
+        message: `${totalReleased} ticket(s) released`,
       });
     }
 
@@ -459,7 +477,7 @@ const confirmPurchase = async (req, res) => {
       const totalPrice = booked.reduce((sum, t) => sum + t.price, 0);
       return res.status(200).json({
         success: true,
-        message: '🎉 Purchase confirmed!',
+        message: 'Purchase confirmed',
         data: {
           tickets: booked,
           totalPrice,
@@ -468,42 +486,46 @@ const confirmPurchase = async (req, res) => {
     }
 
     if (event.eventType === 'ZONED_CAPACITY') {
-      const { holdId } = req.body;
-      const hold = await ZonedHold.findOne({
-        _id:       holdId,
+      // Confirm all active (non-expired) holds for this user on this event
+      const now = new Date();
+      const holds = await ZonedHold.find({
         event:     req.params.id,
         user:      req.user._id,
-        expiresAt: { $gte: new Date() },
+        expiresAt: { $gte: now },
       });
 
-      if (!hold) {
+      if (holds.length === 0) {
         return res.status(409).json({
           success: false,
           message: 'Your hold has expired. Please try again.',
         });
       }
 
-      // Delete hold — inventory stays decremented (permanently sold)
-      await ZonedHold.findByIdAndDelete(hold._id);
-
-      const inventory = await Inventory.findOne({
-        event:    req.params.id,
-        zoneName: hold.zoneName,
-      }).lean();
-
-      io?.to(room).emit('zone:update', {
-        eventId:        req.params.id,
-        zoneName:       hold.zoneName,
-        availableSeats: inventory?.availableSeats ?? 0,
-      });
+      const confirmedZones = [];
+      let totalPrice = 0;
+      for (const hold of holds) {
+        await ZonedHold.findByIdAndDelete(hold._id);
+        const inventory = await Inventory.findOne({ event: req.params.id, zoneName: hold.zoneName }).lean();
+        const subtotal = inventory ? inventory.price * hold.quantity : 0;
+        totalPrice += subtotal;
+        confirmedZones.push({
+          zoneName:  hold.zoneName,
+          quantity:  hold.quantity,
+          subtotal,
+        });
+        io?.to(room).emit('zone:update', {
+          eventId:        req.params.id,
+          zoneName:       hold.zoneName,
+          availableSeats: inventory?.availableSeats ?? 0,
+        });
+      }
 
       return res.status(200).json({
         success: true,
-        message: '🎉 Purchase confirmed!',
+        message: 'Purchase confirmed',
         data: {
-          zoneName:   hold.zoneName,
-          quantity:   hold.quantity,
-          totalPrice: inventory ? inventory.price * hold.quantity : 0,
+          zones:      confirmedZones,
+          totalPrice,
         },
       });
     }
@@ -515,4 +537,53 @@ const confirmPurchase = async (req, res) => {
   }
 };
 
-module.exports = { getSeats, getZones, holdSeats, releaseHold, confirmPurchase };
+// ── GET /api/events/:id/my-tickets ──────────────────────────────────────────────
+// Returns the current user's BOOKED tickets for this event (reserved + zoned metadata).
+const getMyTickets = async (req, res) => {
+  try {
+    const event = await Event.findById(req.params.id).lean();
+    if (!event) return res.status(404).json({ success: false, message: 'Event not found' });
+
+    if (event.eventType === 'RESERVED_SEATING') {
+      const tickets = await Ticket.find({
+        event:    req.params.id,
+        bookedBy: req.user._id,
+        status:   'BOOKED',
+      }).lean();
+
+      const totalPrice = tickets.reduce((s, t) => s + t.price, 0);
+      return res.status(200).json({
+        success: true,
+        data: {
+          type:       'RESERVED_SEATING',
+          tickets:    tickets.map((t) => ({
+            _id:        t._id,
+            section:    t.section,
+            row:        t.row,
+            seatNumber: t.seatNumber,
+            price:      t.price,
+            bookedAt:   t.updatedAt,
+          })),
+          totalPrice,
+          hasBooking: tickets.length > 0,
+        },
+      });
+    }
+
+    if (event.eventType === 'ZONED_CAPACITY') {
+      // Zoned purchases don't leave a permanent record in our schema yet.
+      // We return hasBooking: false so the UI degrades gracefully.
+      return res.status(200).json({
+        success: true,
+        data: { type: 'ZONED_CAPACITY', hasBooking: false, tickets: [], totalPrice: 0 },
+      });
+    }
+
+    return res.status(200).json({ success: true, data: { hasBooking: false } });
+  } catch (error) {
+    console.error('[BookingController] getMyTickets error:', error);
+    return res.status(500).json({ success: false, message: 'Server error' });
+  }
+};
+
+module.exports = { getSeats, getZones, holdSeats, releaseHold, confirmPurchase, getMyTickets };
