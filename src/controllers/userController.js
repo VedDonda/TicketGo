@@ -45,15 +45,39 @@ const getMyBookings = async (req, res) => {
       }
     }
 
-    // Zoned capacity: we store confirmed purchases in Inventory (availableSeats stays low).
-    // We track them via a separate BookedZone model — but since we don't have one yet,
-    // we infer from ZonedHold deletions. Instead, let's create a simple approach:
-    // We'll look at events where the user has no ZonedHold (consumed = confirmed).
-    // Better: we store zoned purchases as synthetic tickets (one per zone booking confirmation).
-    // For now: expose reserved seating bookings + any zoned holds that confirmed.
-    // The confirm endpoint deletes holds, so we rely on a BookedZone collection.
-    // Since there is no such collection yet, we only return reserved seating here.
-    // Zoned bookings are tracked via a "ZonedBooking" approach we'll add below.
+    // Zoned capacity bookings
+    const BookedZone = require('../models/BookedZone');
+    const zonedBookings = await BookedZone.find({ bookedBy: req.user._id })
+      .populate({ path: 'event', select: 'title date venue category eventType status hasImage' })
+      .sort({ createdAt: -1 })
+      .lean();
+    
+    for (const bz of zonedBookings) {
+      if (!bz.event) continue;
+      const eId = bz.event._id.toString();
+      if (!eventMap[eId]) {
+        if (bz.event.hasImage) bz.event.imageUrl = `/api/events/${eId}/image`;
+        eventMap[eId] = {
+          event: bz.event,
+          type: 'ZONED_CAPACITY',
+          tickets: [],
+          totalPrice: 0,
+          bookedAt: bz.createdAt,
+        };
+      }
+      eventMap[eId].tickets.push({
+        _id: bz._id,
+        isZone: true,
+        section: bz.zoneName,
+        quantity: bz.quantity,
+        price: bz.price * bz.quantity,
+        createdAt: bz.createdAt,
+      });
+      eventMap[eId].totalPrice += (bz.price * bz.quantity);
+      if (new Date(bz.createdAt) > new Date(eventMap[eId].bookedAt)) {
+        eventMap[eId].bookedAt = bz.createdAt;
+      }
+    }
 
     const bookings = Object.values(eventMap).sort(
       (a, b) => new Date(b.bookedAt) - new Date(a.bookedAt)

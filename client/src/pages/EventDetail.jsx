@@ -432,7 +432,7 @@ export default function EventDetail() {
                     padding: '6px 0', borderBottom: '1px solid rgba(34,197,94,0.08)',
                   }}>
                     <span style={{ fontSize: '0.8rem', color: '#f0f0f5' }}>
-                      {t.section} · Row {t.row} · Seat {t.seatNumber}
+                      {t.isZone ? `${t.quantity}x ${t.section}` : `${t.section} · Row ${t.row} · Seat ${t.seatNumber}`}
                     </span>
                     <span style={{
                       fontSize: '0.65rem', fontWeight: 700, color: '#22c55e',

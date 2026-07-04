@@ -501,6 +501,7 @@ const confirmPurchase = async (req, res) => {
         });
       }
 
+      const BookedZone = require('../models/BookedZone');
       const confirmedZones = [];
       let totalPrice = 0;
       for (const hold of holds) {
@@ -508,6 +509,15 @@ const confirmPurchase = async (req, res) => {
         const inventory = await Inventory.findOne({ event: req.params.id, zoneName: hold.zoneName }).lean();
         const subtotal = inventory ? inventory.price * hold.quantity : 0;
         totalPrice += subtotal;
+
+        await BookedZone.create({
+          event: req.params.id,
+          bookedBy: req.user._id,
+          zoneName: hold.zoneName,
+          quantity: hold.quantity,
+          price: inventory ? inventory.price : 0,
+        });
+
         confirmedZones.push({
           zoneName:  hold.zoneName,
           quantity:  hold.quantity,
@@ -571,11 +581,26 @@ const getMyTickets = async (req, res) => {
     }
 
     if (event.eventType === 'ZONED_CAPACITY') {
-      // Zoned purchases don't leave a permanent record in our schema yet.
-      // We return hasBooking: false so the UI degrades gracefully.
+      const BookedZone = require('../models/BookedZone');
+      const bookedZones = await BookedZone.find({
+        event: req.params.id,
+        bookedBy: req.user._id,
+      }).lean();
+
+      const tickets = bookedZones.map(bz => ({
+        _id: bz._id,
+        isZone: true,
+        section: bz.zoneName,
+        quantity: bz.quantity,
+        price: bz.price * bz.quantity,
+        bookedAt: bz.createdAt,
+      }));
+
+      const totalPrice = bookedZones.reduce((s, bz) => s + (bz.price * bz.quantity), 0);
+      
       return res.status(200).json({
         success: true,
-        data: { type: 'ZONED_CAPACITY', hasBooking: false, tickets: [], totalPrice: 0 },
+        data: { type: 'ZONED_CAPACITY', hasBooking: bookedZones.length > 0, tickets, totalPrice },
       });
     }
 

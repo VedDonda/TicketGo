@@ -40,9 +40,12 @@ const start = async () => {
     socket.on('disconnect', () => {});
   });
 
-  httpServer.listen(PORT, () => {
+  const server = httpServer.listen(PORT, () => {
     console.log(`TicketGo server running on http://localhost:${PORT}`);
   });
+  
+  server.keepAliveTimeout = 65000;
+  server.headersTimeout = 66000;
 };
 
 start();

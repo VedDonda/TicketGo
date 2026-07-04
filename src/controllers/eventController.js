@@ -62,6 +62,7 @@ const createEvent = async (req, res) => {
       seatingConfig: eventType === 'RESERVED_SEATING' ? seatingConfig : undefined,
       zoningConfig:  eventType === 'ZONED_CAPACITY'   ? zoningConfig  : undefined,
       imageUrl,
+      hasImage: !!imageUrl && imageUrl.startsWith('data:image'),
       status: 'DRAFT', // Always start as DRAFT
     });
 
@@ -308,6 +309,7 @@ const updateEventImage = async (req, res) => {
     }
 
     event.imageUrl = req.body.imageUrl;
+    event.hasImage = !!req.body.imageUrl && req.body.imageUrl.startsWith('data:image');
     await event.save();
 
     return res.status(200).json({ success: true, message: 'Event image updated successfully', data: { event } });

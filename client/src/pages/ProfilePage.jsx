@@ -368,7 +368,7 @@ export default function ProfilePage() {
                                 border: '1px solid #1e1e28', borderRadius: 8,
                               }}>
                                 <span style={{ fontSize: '0.85rem', color: '#f0f0f5' }}>
-                                  {t.section} · Row {t.row} · Seat {t.seatNumber}
+                                  {t.isZone ? `${t.quantity}x ${t.section}` : `${t.section} · Row ${t.row} · Seat ${t.seatNumber}`}
                                 </span>
                                 <span style={{ fontSize: '0.85rem', color: '#8084e8', fontWeight: 700 }}>
                                   {formatPrice(t.price)}
