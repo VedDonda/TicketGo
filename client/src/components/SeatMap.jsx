@@ -213,7 +213,7 @@ export default function SeatMap({ eventId, socket, onHoldConfirmed }) {
       </div>
 
       {/* ── Sections ─────────────────────────────────────────────────────── */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 28, overflowY: 'auto', maxHeight: '55vh' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 28, overflowY: 'auto', overflowX: 'auto', maxHeight: '55vh', paddingBottom: 16 }}>
         {sections.map((section) => {
           const rows = seatData[section];
           const rowKeys = Object.keys(rows).sort();
@@ -237,7 +237,7 @@ export default function SeatMap({ eventId, socket, onHoldConfirmed }) {
                       {row}
                     </span>
                     {/* Seats */}
-                    <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+                    <div style={{ display: 'flex', gap: 4, flexWrap: 'nowrap', minWidth: 'max-content' }}>
                       {rows[row].map((seat) => {
                         const status = getSeatStatus(seat);
                         const st = SEAT_STYLES[status];

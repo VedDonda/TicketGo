@@ -80,3 +80,24 @@
     radial-gradient(ellipse 60% 40% at 50% 0%, rgba(91,95,199,0.18) 0%, transparent 60%),
     radial-gradient(ellipse 40% 30% at 80% 80%, rgba(255,140,0,0.10) 0%, transparent 50%);
 }
+
+/* ── Custom Scrollbar UI ── */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-track {
+  background: var(--color-bg-dark);
+}
+::-webkit-scrollbar-thumb {
+  background: #2a2a35;
+  border-radius: 6px;
+  border: 2px solid var(--color-bg-dark);
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #5b5fc7;
+}
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #2a2a35 var(--color-bg-dark);
+}

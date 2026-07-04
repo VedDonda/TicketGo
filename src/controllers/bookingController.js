@@ -94,7 +94,7 @@ const getSeats = async (req, res) => {
     return res.status(200).json({ success: true, data: { seats: grouped } });
   } catch (error) {
     console.error('[BookingController] getSeats error:', error);
-    return res.status(500).json({ success: false, message: 'Server error fetching seats' });
+    return res.status(500).json({ success: false, message: 'An unexpected error occurred while fetching seats. Please try again later.' });
   }
 };
 
@@ -126,7 +126,7 @@ const getZones = async (req, res) => {
     });
   } catch (error) {
     console.error('[BookingController] getZones error:', error);
-    return res.status(500).json({ success: false, message: 'Server error fetching zones' });
+    return res.status(500).json({ success: false, message: 'An unexpected error occurred while fetching zones. Please try again later.' });
   }
 };
 
@@ -348,7 +348,7 @@ const holdSeats = async (req, res) => {
     return res.status(400).json({ success: false, message: 'Unknown event type' });
   } catch (error) {
     console.error('[BookingController] holdSeats error:', error);
-    return res.status(500).json({ success: false, message: 'Server error placing hold' });
+    return res.status(500).json({ success: false, message: 'An unexpected error occurred while placing your hold. Please try again later.' });
   }
 };
 
@@ -410,7 +410,7 @@ const releaseHold = async (req, res) => {
     return res.status(400).json({ success: false, message: 'Unknown event type' });
   } catch (error) {
     console.error('[BookingController] releaseHold error:', error);
-    return res.status(500).json({ success: false, message: 'Server error releasing hold' });
+    return res.status(500).json({ success: false, message: 'An unexpected error occurred while releasing your hold. Please try again later.' });
   }
 };
 
@@ -533,7 +533,7 @@ const confirmPurchase = async (req, res) => {
     return res.status(400).json({ success: false, message: 'Unknown event type' });
   } catch (error) {
     console.error('[BookingController] confirmPurchase error:', error);
-    return res.status(500).json({ success: false, message: 'Server error confirming purchase' });
+    return res.status(500).json({ success: false, message: 'An unexpected error occurred while confirming your purchase. Please try again later.' });
   }
 };
 
@@ -582,7 +582,7 @@ const getMyTickets = async (req, res) => {
     return res.status(200).json({ success: true, data: { hasBooking: false } });
   } catch (error) {
     console.error('[BookingController] getMyTickets error:', error);
-    return res.status(500).json({ success: false, message: 'Server error' });
+    return res.status(500).json({ success: false, message: 'An unexpected error occurred while fetching your tickets. Please try again later.' });
   }
 };
 

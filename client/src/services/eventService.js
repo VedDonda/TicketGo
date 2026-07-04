@@ -41,3 +41,81 @@ export const createEventRequest = async (payload) => {
   });
   return res.json().then((data) => ({ ok: res.ok, data }));
 };
+
+/**
+ * Delete an event by ID (ADMIN only).
+ */
+export const deleteEventRequest = async (id) => {
+  const token = localStorage.getItem('tg_token');
+  const res = await fetch(`${API}/${id}`, {
+    method: 'DELETE',
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  return res.json().then((data) => ({ ok: res.ok, data }));
+};
+
+/**
+ * Upload an image file for an event.
+ */
+export const uploadImageRequest = async (file) => {
+  const token = localStorage.getItem('tg_token');
+  const formData = new FormData();
+  formData.append('image', file);
+
+  const res = await fetch('/api/upload', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}` },
+    body: formData,
+  });
+  return res.json().then((data) => ({ ok: res.ok, data }));
+};
+
+/**
+ * Update the image of an event.
+ */
+export const updateEventImageRequest = async (id, imageUrl) => {
+  const token = localStorage.getItem('tg_token');
+  const res = await fetch(`${API}/${id}/image`, {
+    method: 'PUT',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`
+    },
+    body: JSON.stringify({ imageUrl })
+  });
+  return res.json().then((data) => ({ ok: res.ok, data }));
+};
+
+/**
+ * Fetch events created by the logged-in organizer.
+ */
+export const fetchMyCreatedEvents = async () => {
+  const token = localStorage.getItem('tg_token');
+  const res = await fetch(`${API}/organizer/me`, {
+    headers: { Authorization: `Bearer ${token}` }
+  });
+  return res.json().then((data) => ({ ok: res.ok, data }));
+};
+
+/**
+ * Publish a draft event.
+ */
+export const publishEventRequest = async (eventId) => {
+  const token = localStorage.getItem('tg_token');
+  const res = await fetch(`${API}/${eventId}/publish`, {
+    method: 'PUT',
+    headers: { Authorization: `Bearer ${token}` }
+  });
+  return res.json().then((data) => ({ ok: res.ok, data }));
+};
+
+/**
+ * Fetch dashboard metrics for an event.
+ */
+export const fetchDashboardMetrics = async (eventId) => {
+  const token = localStorage.getItem('tg_token');
+  const res = await fetch(`${API}/${eventId}/dashboard-metrics`, {
+    headers: { Authorization: `Bearer ${token}` }
+  });
+  return res.json().then((data) => ({ ok: res.ok, data }));
+};

@@ -63,7 +63,7 @@ const buildInventoryDocuments = (event) =>
  * @param {string|ObjectId} eventId
  * @returns {{ insertedCount: number }}
  */
-const generateSeatsForEvent = async (eventId) => {
+const generateSeatsForEvent = async (eventId, targetStatus = 'PUBLISHED') => {
   const event = await Event.findById(eventId);
   if (!event) throw new Error(`Event ${eventId} not found`);
 
@@ -85,7 +85,7 @@ const generateSeatsForEvent = async (eventId) => {
     insertedCount = result.length;
   }
 
-  await Event.findByIdAndUpdate(eventId, { status: 'PUBLISHED' });
+  await Event.findByIdAndUpdate(eventId, { status: targetStatus });
 
   return { insertedCount };
 };

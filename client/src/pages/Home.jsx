@@ -249,115 +249,40 @@ export default function Home() {
         .fade-up { animation: fadeUp 0.5s ease both; }
       `}</style>
 
-      {/* ── Navbar ───────────────────────────────────────── */}
-      <nav style={{
-        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        padding: '0 40px', height: '64px',
-        background: 'rgba(13,13,15,0.92)', backdropFilter: 'blur(12px)',
-        borderBottom: '1px solid #2a2a35', position: 'sticky', top: 0, zIndex: 50,
-      }}>
-        <Link to="/" style={{ display: 'flex', alignItems: 'center', gap: '10px', textDecoration: 'none' }}>
-          <div style={{ width: 36, height: 36, background: '#5b5fc7', borderRadius: '10px',
-            display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <TicketIcon />
-          </div>
-          <span style={{ fontSize: '1.15rem', fontWeight: 800, color: '#f0f0f5' }}>TicketGo</span>
-        </Link>
-
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-          {user ? (
-            <>
-              {user.role === 'ORGANIZER' && (
-                <Link to="/events/create" style={{
-                  padding: '7px 16px', background: 'rgba(91,95,199,0.15)',
-                  border: '1px solid rgba(91,95,199,0.3)', color: '#8084e8',
-                  borderRadius: '8px', fontSize: '0.83rem', fontWeight: 600, textDecoration: 'none',
-                }}>
-                  + Create Event
-                </Link>
-              )}
-              <Link to="/profile" style={{ display: 'flex', alignItems: 'center', gap: '8px', textDecoration: 'none' }}>
-                <div style={{ width: 32, height: 32, borderRadius: '50%', background: '#5b5fc7',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  fontWeight: 700, fontSize: '0.85rem', color: '#fff' }}>{initial}</div>
-                <span style={{ fontSize: '0.875rem', color: '#f0f0f5', fontWeight: 500 }}>{user.name}</span>
-              </Link>
-              <button onClick={handleLogout} style={{
-                padding: '7px 14px', background: 'transparent', border: '1px solid #2a2a35',
-                color: '#8888a0', borderRadius: '8px', fontSize: '0.82rem', cursor: 'pointer',
-                fontFamily: 'Inter, sans-serif', transition: 'all 0.2s',
-              }}
-                onMouseEnter={e => { e.currentTarget.style.borderColor = '#e05c6a'; e.currentTarget.style.color = '#e05c6a'; }}
-                onMouseLeave={e => { e.currentTarget.style.borderColor = '#2a2a35'; e.currentTarget.style.color = '#8888a0'; }}
-              >Logout</button>
-            </>
-          ) : (
-            <>
-              <Link to="/login" style={{ padding: '7px 18px', border: '1.5px solid #2a2a35',
-                color: '#f0f0f5', borderRadius: '8px', fontSize: '0.875rem', fontWeight: 500,
-                textDecoration: 'none', transition: 'all 0.2s' }}>Sign In</Link>
-              <Link to="/signup" style={{ padding: '7px 18px', background: '#5b5fc7',
-                color: '#fff', borderRadius: '8px', fontSize: '0.875rem', fontWeight: 600,
-                textDecoration: 'none' }}>Get Started</Link>
-            </>
-          )}
-        </div>
-      </nav>
-
-      {/* ── Hero ─────────────────────────────────────────── */}
+      {/* ── Hero / Search ─────────────────────────────────────────── */}
       <section style={{
-        padding: '80px 40px 60px', textAlign: 'center', position: 'relative', overflow: 'hidden',
-        background: 'radial-gradient(ellipse 70% 50% at 50% 0%, rgba(91,95,199,0.2) 0%, transparent 65%)',
+        padding: '60px 40px 40px', position: 'relative', overflow: 'hidden',
+        background: 'radial-gradient(circle at 50% 0%, rgba(91,95,199,0.15) 0%, transparent 65%)',
       }}>
-        <h1 className="fade-up" style={{
-          fontSize: 'clamp(2rem,4vw,3.2rem)', fontWeight: 800,
-          letterSpacing: '-1px', lineHeight: 1.1, margin: '0 auto 16px',
-          maxWidth: '700px', animationDelay: '0.1s', color: '#f0f0f5',
-        }}>
-          Book Tickets for Live Events
-        </h1>
-
-        <p className="fade-up" style={{
-          fontSize: '1.05rem', color: '#8888a0', maxWidth: '460px',
-          margin: '0 auto 36px', lineHeight: 1.75, animationDelay: '0.2s',
-        }}>
-          High-performance ticket booking built for massive crowds.
-          Secure, fast, and fair — every seat, every time.
-        </p>
-
         {/* Search bar */}
         <form className="fade-up" onSubmit={handleSearch} style={{
           display: 'flex', alignItems: 'center', gap: '0',
-          maxWidth: '520px', margin: '0 auto', animationDelay: '0.3s',
-          background: '#161619', border: '1px solid #2a2a35',
-          borderRadius: '12px', overflow: 'hidden',
-          boxShadow: '0 4px 24px rgba(0,0,0,0.3)',
+          maxWidth: '600px', margin: '0 auto', animationDelay: '0.1s',
+          background: 'rgba(17,17,22,0.8)', border: '1px solid rgba(255,255,255,0.08)', backdropFilter: 'blur(10px)',
+          borderRadius: '16px', overflow: 'hidden',
+          boxShadow: '0 8px 32px rgba(0,0,0,0.4)',
         }}>
-          <div style={{ padding: '0 14px', color: '#55556a', display: 'flex', alignItems: 'center' }}>
+          <div style={{ padding: '0 18px', color: '#8084e8', display: 'flex', alignItems: 'center' }}>
             <SearchIcon />
           </div>
           <input
             type="text"
             id="event-search"
-            placeholder="Search events, artists, venues…"
+            placeholder="Search for amazing live events..."
             value={searchInput}
             onChange={e => setSearchInput(e.target.value)}
             style={{
               flex: 1, background: 'transparent', border: 'none', outline: 'none',
-              color: '#f0f0f5', fontSize: '0.9rem', padding: '14px 0',
+              color: '#f0f0f5', fontSize: '0.95rem', padding: '16px 0',
               fontFamily: 'Inter, sans-serif',
             }}
           />
           <button type="submit" style={{
-            padding: '12px 24px', background: '#5b5fc7', border: 'none',
-            color: '#fff', fontWeight: 700, fontSize: '0.875rem',
+            padding: '16px 28px', background: 'linear-gradient(135deg,#5b5fc7,#8084e8)', border: 'none',
+            color: '#fff', fontWeight: 800, fontSize: '0.9rem',
             cursor: 'pointer', fontFamily: 'Inter, sans-serif',
-            transition: 'background 0.2s',
-          }}
-            onMouseEnter={e => e.currentTarget.style.background = '#4a4eb8'}
-            onMouseLeave={e => e.currentTarget.style.background = '#5b5fc7'}
-          >
-            Search
+          }}>
+            Find Events
           </button>
         </form>
       </section>
@@ -426,7 +351,7 @@ export default function Home() {
             background: 'rgba(224,92,106,0.05)', border: '1px solid rgba(224,92,106,0.15)',
             borderRadius: '16px',
           }}>
-            <div style={{ fontSize: '2rem', marginBottom: '12px' }}>⚠️</div>
+            <div style={{ fontSize: '2rem', marginBottom: '12px', color: '#f87171' }}>!</div>
             <p style={{ color: '#e05c6a', fontWeight: 600 }}>{error}</p>
             <button onClick={loadEvents} style={{
               marginTop: '16px', padding: '10px 24px', background: '#5b5fc7',
@@ -439,7 +364,7 @@ export default function Home() {
             textAlign: 'center', padding: '80px 20px',
             background: '#161619', border: '1px solid #2a2a35', borderRadius: '16px',
           }}>
-            <div style={{ fontSize: '3rem', marginBottom: '16px' }}>🎟️</div>
+            <div style={{ fontSize: '3rem', marginBottom: '16px', color: '#5b5fc7', fontWeight: 800 }}>***</div>
             <h3 style={{ margin: '0 0 8px', fontSize: '1.1rem', color: '#f0f0f5' }}>No events found</h3>
             <p style={{ color: '#55556a', fontSize: '0.875rem' }}>
               {search ? 'Try a different search term.' : 'No upcoming events in this category yet.'}

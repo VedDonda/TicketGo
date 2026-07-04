@@ -1,14 +1,9 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { getCurrentUser, clearSession } from '../services/authService';
-import { createEventRequest } from '../services/eventService';
+import { createEventRequest, uploadImageRequest } from '../services/eventService';
 
 // ─── Icons ────────────────────────────────────────────────────────────────────
-const TicketIcon = () => (
-  <svg viewBox="0 0 24 24" fill="white" xmlns="http://www.w3.org/2000/svg" width="18" height="18">
-    <path d="M22 9V7a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v2a2 2 0 0 1 0 4v2a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-2a2 2 0 0 1 0-4z" />
-  </svg>
-);
 const PlusIcon = () => (
   <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
     <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
@@ -98,12 +93,16 @@ export default function CreateEvent() {
   const navigate = useNavigate();
   const user     = getCurrentUser();
 
+  const isSubmitting = useRef(false);
+
   // Core fields
   const [title,       setTitle]       = useState('');
   const [description, setDescription] = useState('');
   const [category,    setCategory]    = useState('');
   const [date,        setDate]        = useState('');
   const [imageUrl,    setImageUrl]    = useState('');
+  const [imageUploading, setImageUploading] = useState(false);
+  const [status,      setStatus]      = useState('PUBLISHED');
 
   // Venue
   const [venueName,     setVenueName]     = useState('');
@@ -121,16 +120,57 @@ export default function CreateEvent() {
   const [loading, setLoading] = useState(false);
 
   // ── Seating config helpers ───────────────────────────────────────────────
-  const updateSection = (i, field, val) =>
+  const updateSection = (i, field, val) => {
     setSeatingConfig(prev => prev.map((s, idx) => idx === i ? { ...s, [field]: val } : s));
+    const errorKey = field === 'section' ? `sec_${i}_section` :
+                     field === 'rows' ? `sec_${i}_rows` :
+                     field === 'seatsPerRow' ? `sec_${i}_spr` :
+                     field === 'price' ? `sec_${i}_price` : null;
+    if (errorKey && errors[errorKey]) {
+      if ((field === 'section' && val.trim()) || (field === 'rows' && +val >= 1) || (field === 'seatsPerRow' && +val >= 1) || (field === 'price' && +val >= 0 && val !== '')) {
+        setErrors(prev => ({ ...prev, [errorKey]: null }));
+      }
+    }
+    if (alert) setAlert(null);
+  };
   const addSection    = () => setSeatingConfig(prev => [...prev, EMPTY_SEAT_SECTION()]);
   const removeSection = (i) => setSeatingConfig(prev => prev.filter((_, idx) => idx !== i));
 
   // ── Zoning config helpers ────────────────────────────────────────────────
-  const updateZone    = (i, field, val) =>
+  const updateZone = (i, field, val) => {
     setZoningConfig(prev => prev.map((z, idx) => idx === i ? { ...z, [field]: val } : z));
+    const errorKey = field === 'zoneName' ? `zone_${i}_name` :
+                     field === 'totalSeats' ? `zone_${i}_seats` :
+                     field === 'price' ? `zone_${i}_price` : null;
+    if (errorKey && errors[errorKey]) {
+      if ((field === 'zoneName' && val.trim()) || (field === 'totalSeats' && +val >= 1) || (field === 'price' && +val >= 0 && val !== '')) {
+        setErrors(prev => ({ ...prev, [errorKey]: null }));
+      }
+    }
+    if (alert) setAlert(null);
+  };
   const addZone       = () => setZoningConfig(prev => [...prev, EMPTY_ZONE()]);
   const removeZone    = (i) => setZoningConfig(prev => prev.filter((_, idx) => idx !== i));
+
+  // ── Image Upload ─────────────────────────────────────────────────────────
+  const handleImageUpload = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    setImageUploading(true);
+    setAlert(null);
+    try {
+      const { ok, data } = await uploadImageRequest(file);
+      if (ok && data.success) {
+        setImageUrl(data.data.url);
+      } else {
+        setAlert({ msg: data.message || 'Image upload failed', type: 'err' });
+      }
+    } catch {
+      setAlert({ msg: 'Network error during image upload.', type: 'err' });
+    } finally {
+      setImageUploading(false);
+    }
+  };
 
   // ── Validation ───────────────────────────────────────────────────────────
   const validate = () => {
@@ -166,10 +206,12 @@ export default function CreateEvent() {
   // ── Submit ───────────────────────────────────────────────────────────────
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (isSubmitting.current) return;
     setAlert(null);
     const errs = validate();
     if (Object.keys(errs).length) { setErrors(errs); return; }
     setErrors({});
+    isSubmitting.current = true;
     setLoading(true);
 
     const payload = {
@@ -178,6 +220,7 @@ export default function CreateEvent() {
       category,
       date: new Date(date).toISOString(),
       imageUrl: imageUrl.trim() || undefined,
+      status,
       venue: {
         name: venueName.trim(),
         city: venueCity.trim(),
@@ -208,12 +251,13 @@ export default function CreateEvent() {
         setAlert({ msg: data.message || 'Failed to create event', type: 'err' });
         return;
       }
-      setAlert({ msg: '🎉 Event created successfully! Redirecting…', type: 'ok' });
+      setAlert({ msg: 'Event created successfully! Redirecting...', type: 'ok' });
       setTimeout(() => navigate('/'), 1800);
     } catch {
       setAlert({ msg: 'Network error. Make sure the backend server is running.', type: 'err' });
     } finally {
       setLoading(false);
+      isSubmitting.current = false;
     }
   };
 
@@ -224,23 +268,7 @@ export default function CreateEvent() {
 
   return (
     <div style={S.page}>
-      {/* ── Navbar ──────────────────────────────────────── */}
-      <nav style={S.nav}>
-        <Link to="/" style={{ display: 'flex', alignItems: 'center', gap: 10, textDecoration: 'none' }}>
-          <div style={{ width: 34, height: 34, background: '#5b5fc7', borderRadius: 9,
-            display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <TicketIcon />
-          </div>
-          <span style={{ fontSize: '1.1rem', fontWeight: 800, color: '#f0f0f5' }}>TicketGo</span>
-        </Link>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <span style={{ fontSize: '0.83rem', color: '#8888a0' }}>{user?.name}</span>
-          <button onClick={handleLogout} style={{
-            padding: '6px 14px', background: 'transparent', border: '1px solid #2a2a35',
-            color: '#8888a0', borderRadius: 8, fontSize: '0.8rem', cursor: 'pointer', fontFamily: 'Inter,sans-serif',
-          }}>Logout</button>
-        </div>
-      </nav>
+
 
       {/* ── Page body ───────────────────────────────────── */}
       <div style={S.body}>
@@ -268,13 +296,23 @@ export default function CreateEvent() {
 
             {fld('ev-title', 'Event Title *', 'input', {
               type: 'text', placeholder: 'e.g. Coldplay World Tour 2025',
-              value: title, onChange: e => setTitle(e.target.value),
+              value: title, onChange: e => {
+                const val = e.target.value;
+                setTitle(val);
+                if (errors.title && val.trim()) setErrors(prev => ({ ...prev, title: null }));
+                if (alert) setAlert(null);
+              },
               onFocus: focusStyle, onBlur: blurStyle,
             }, errors.title)}
 
             {fld('ev-desc', 'Description *', 'textarea', {
               placeholder: 'Describe your event — performers, highlights, rules…',
-              value: description, onChange: e => setDescription(e.target.value),
+              value: description, onChange: e => {
+                const val = e.target.value;
+                setDescription(val);
+                if (errors.description && val.trim()) setErrors(prev => ({ ...prev, description: null }));
+                if (alert) setAlert(null);
+              },
               onFocus: focusStyle, onBlur: blurStyle,
             }, errors.description)}
 
@@ -282,7 +320,12 @@ export default function CreateEvent() {
               <div>
                 <label htmlFor="ev-category" style={S.label}>Category *</label>
                 <select id="ev-category" style={S.select}
-                  value={category} onChange={e => setCategory(e.target.value)}
+                  value={category} onChange={e => {
+                    const val = e.target.value;
+                    setCategory(val);
+                    if (errors.category && val) setErrors(prev => ({ ...prev, category: null }));
+                    if (alert) setAlert(null);
+                  }}
                   onFocus={focusStyle} onBlur={blurStyle}>
                   <option value="">— Select category —</option>
                   {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
@@ -292,17 +335,30 @@ export default function CreateEvent() {
               <div>
                 {fld('ev-date', 'Event Date & Time *', 'input', {
                   type: 'datetime-local',
-                  value: date, onChange: e => setDate(e.target.value),
+                  value: date, onChange: e => {
+                    const val = e.target.value;
+                    setDate(val);
+                    if (errors.date && new Date(val) > new Date()) setErrors(prev => ({ ...prev, date: null }));
+                    if (alert) setAlert(null);
+                  },
                   onFocus: focusStyle, onBlur: blurStyle,
                 }, errors.date)}
               </div>
             </div>
 
-            {fld('ev-img', 'Cover Image URL (optional)', 'input', {
-              type: 'url', placeholder: 'https://…',
-              value: imageUrl, onChange: e => setImageUrl(e.target.value),
-              onFocus: focusStyle, onBlur: blurStyle,
-            }, null)}
+            <div style={S.row2}>
+              {fld('ev-img', 'Cover Image URL (optional)', 'input', {
+                type: 'url', placeholder: 'https://...',
+                value: imageUrl, onChange: e => { setImageUrl(e.target.value); if (alert) setAlert(null); },
+                onFocus: focusStyle, onBlur: blurStyle,
+              }, null)}
+              <div>
+                <label style={S.label}>Or Upload Image File</label>
+                <input type="file" accept="image/*" onChange={handleImageUpload} disabled={imageUploading}
+                  style={{ ...S.input, padding: '8px 14px' }} />
+                {imageUploading && <p style={{ fontSize: '0.76rem', color: '#8084e8', marginTop: 5 }}>Uploading...</p>}
+              </div>
+            </div>
           </div>
 
           {/* ── Venue ───────────────────────────────────── */}
@@ -311,24 +367,44 @@ export default function CreateEvent() {
             <div style={S.row2}>
               {fld('ev-vname', 'Venue Name *', 'input', {
                 type: 'text', placeholder: 'e.g. Wembley Stadium',
-                value: venueName, onChange: e => setVenueName(e.target.value),
+                value: venueName, onChange: e => {
+                  const val = e.target.value;
+                  setVenueName(val);
+                  if (errors.venueName && val.trim()) setErrors(prev => ({ ...prev, venueName: null }));
+                  if (alert) setAlert(null);
+                },
                 onFocus: focusStyle, onBlur: blurStyle,
               }, errors.venueName)}
               {fld('ev-vcity', 'City *', 'input', {
                 type: 'text', placeholder: 'e.g. Mumbai',
-                value: venueCity, onChange: e => setVenueCity(e.target.value),
+                value: venueCity, onChange: e => {
+                  const val = e.target.value;
+                  setVenueCity(val);
+                  if (errors.venueCity && val.trim()) setErrors(prev => ({ ...prev, venueCity: null }));
+                  if (alert) setAlert(null);
+                },
                 onFocus: focusStyle, onBlur: blurStyle,
               }, errors.venueCity)}
             </div>
             <div style={S.row2}>
               {fld('ev-vaddress', 'Address *', 'input', {
                 type: 'text', placeholder: 'Full street address',
-                value: venueAddress, onChange: e => setVenueAddress(e.target.value),
+                value: venueAddress, onChange: e => {
+                  const val = e.target.value;
+                  setVenueAddress(val);
+                  if (errors.venueAddress && val.trim()) setErrors(prev => ({ ...prev, venueAddress: null }));
+                  if (alert) setAlert(null);
+                },
                 onFocus: focusStyle, onBlur: blurStyle,
               }, errors.venueAddress)}
               {fld('ev-vcap', 'Total Capacity *', 'input', {
                 type: 'number', min: 1, placeholder: '50000',
-                value: venueCapacity, onChange: e => setVenueCapacity(e.target.value),
+                value: venueCapacity, onChange: e => {
+                  const val = e.target.value;
+                  setVenueCapacity(val);
+                  if (errors.venueCapacity && !isNaN(val) && +val >= 1) setErrors(prev => ({ ...prev, venueCapacity: null }));
+                  if (alert) setAlert(null);
+                },
                 onFocus: focusStyle, onBlur: blurStyle,
               }, errors.venueCapacity)}
             </div>
@@ -340,7 +416,7 @@ export default function CreateEvent() {
             <div style={{ display: 'flex', gap: 12, marginBottom: 24 }}>
               <button type="button" id="type-reserved" style={S.typeBtn(eventType === 'RESERVED_SEATING')}
                 onClick={() => setEventType('RESERVED_SEATING')}>
-                <div style={{ fontSize: '1.4rem', marginBottom: 6 }}>💺</div>
+
                 <div>Reserved Seating</div>
                 <div style={{ fontSize: '0.73rem', fontWeight: 400, marginTop: 4, color: '#55556a' }}>
                   Specific row & seat number per ticket
@@ -348,7 +424,7 @@ export default function CreateEvent() {
               </button>
               <button type="button" id="type-zoned" style={S.typeBtn(eventType === 'ZONED_CAPACITY')}
                 onClick={() => setEventType('ZONED_CAPACITY')}>
-                <div style={{ fontSize: '1.4rem', marginBottom: 6 }}>🟢</div>
+
                 <div>Zoned (General Admission)</div>
                 <div style={{ fontSize: '0.73rem', fontWeight: 400, marginTop: 4, color: '#55556a' }}>
                   Named zones with a capacity pool
@@ -472,21 +548,33 @@ export default function CreateEvent() {
               <p style={{ ...S.sectionTitle, color: '#5b5fc7', borderColor: 'rgba(91,95,199,0.2)' }}>Preview</p>
               <div style={{ fontSize: '0.875rem', color: '#8888a0', display: 'flex', flexDirection: 'column', gap: 6 }}>
                 {title      && <span><strong style={{ color: '#f0f0f5' }}>{title}</strong></span>}
-                {category   && <span>📁 {category}</span>}
-                {date       && <span>📅 {new Date(date).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' })}</span>}
-                {venueName  && <span>📍 {venueName}{venueCity ? `, ${venueCity}` : ''}</span>}
+                {category   && <span>Category: {category}</span>}
+                {date       && <span>Date: {new Date(date).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' })}</span>}
+                {venueName  && <span>Venue: {venueName}{venueCity ? `, ${venueCity}` : ''}</span>}
                 {eventType === 'RESERVED_SEATING' && seatingConfig[0]?.section && (
-                  <span>💺 {seatingConfig.length} section(s) · {seatingConfig.reduce((t, s) => t + (+s.rows||0)*(+s.seatsPerRow||0), 0).toLocaleString()} seats total</span>
+                  <span>Sections: {seatingConfig.length} section(s) · {seatingConfig.reduce((t, s) => t + (+s.rows||0)*(+s.seatsPerRow||0), 0).toLocaleString()} seats total</span>
                 )}
                 {eventType === 'ZONED_CAPACITY' && zoningConfig[0]?.zoneName && (
-                  <span>🟢 {zoningConfig.length} zone(s) · {zoningConfig.reduce((t, z) => t + (+z.totalSeats||0), 0).toLocaleString()} seats total</span>
+                  <span>Zones: {zoningConfig.length} zone(s) · {zoningConfig.reduce((t, z) => t + (+z.totalSeats||0), 0).toLocaleString()} seats total</span>
                 )}
               </div>
             </div>
           )}
 
+          {/* ── Status ──────────────────────────────────── */}
+          <div style={S.card}>
+            <p style={S.sectionTitle}>Publish Status</p>
+            <div style={{ maxWidth: 300 }}>
+              <label htmlFor="ev-status" style={S.label}>Visibility *</label>
+              <select id="ev-status" style={S.select} value={status} onChange={e => setStatus(e.target.value)} onFocus={focusStyle} onBlur={blurStyle}>
+                <option value="PUBLISHED">Publish (Visible to everyone)</option>
+                <option value="DRAFT">Draft (Hidden, you can publish later)</option>
+              </select>
+            </div>
+          </div>
+
           <button id="submit-event" type="submit" disabled={loading} style={S.submitBtn(loading)}>
-            {loading ? '⏳ Creating Event…' : '🚀 Create Event'}
+            {loading ? 'Creating Event...' : status === 'DRAFT' ? 'Save as Draft' : 'Create & Publish Event'}
           </button>
         </form>
       </div>

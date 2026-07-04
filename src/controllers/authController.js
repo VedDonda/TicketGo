@@ -51,7 +51,7 @@ const signup = async (req, res) => {
       return res.status(400).json({ success: false, message: messages.join(', ') });
     }
     console.error('Signup error:', error);
-    res.status(500).json({ success: false, message: 'Server error' });
+    res.status(500).json({ success: false, message: 'An unexpected error occurred. Please try again later.' });
   }
 };
 
@@ -79,7 +79,7 @@ const login = async (req, res) => {
 
     sendTokenResponse(user, 200, res);
   } catch (error) {
-    res.status(500).json({ success: false, message: 'Server error' });
+    res.status(500).json({ success: false, message: 'An unexpected error occurred. Please try again later.' });
   }
 };
 
@@ -91,7 +91,7 @@ const getMe = async (req, res) => {
     const user = await User.findById(req.user.id);
     res.status(200).json({ success: true, user });
   } catch (error) {
-    res.status(500).json({ success: false, message: 'Server error' });
+    res.status(500).json({ success: false, message: 'An unexpected error occurred. Please try again later.' });
   }
 };
 

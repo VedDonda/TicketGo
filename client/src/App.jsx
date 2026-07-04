@@ -1,5 +1,6 @@
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { getToken } from './services/authService';
+import Navbar       from './components/Navbar';
 import Login        from './pages/Login';
 import Signup       from './pages/Signup';
 import Home         from './pages/Home';
@@ -7,6 +8,7 @@ import CreateEvent  from './pages/CreateEvent';
 import EventDetail  from './pages/EventDetail';
 import BookingPage  from './pages/BookingPage';
 import ProfilePage  from './pages/ProfilePage';
+import OrganizerDashboard from './pages/OrganizerDashboard';
 
 // Guard: redirect to /login if not authenticated
 function PrivateRoute({ children }) {
@@ -18,9 +20,13 @@ function GuestRoute({ children }) {
   return !getToken() ? children : <Navigate to="/" replace />;
 }
 
-export default function App() {
+function AppContent() {
+  const location = useLocation();
+  const hideNavbar = ['/login', '/signup'].includes(location.pathname);
+  
   return (
-    <BrowserRouter>
+    <>
+      {!hideNavbar && <Navbar />}
       <Routes>
         <Route path="/" element={
           <PrivateRoute><Home /></PrivateRoute>
@@ -37,6 +43,9 @@ export default function App() {
         <Route path="/events/:id" element={
           <PrivateRoute><EventDetail /></PrivateRoute>
         } />
+        <Route path="/events/:id/dashboard" element={
+          <PrivateRoute><OrganizerDashboard /></PrivateRoute>
+        } />
         <Route path="/events/:id/book" element={
           <PrivateRoute><BookingPage /></PrivateRoute>
         } />
@@ -46,6 +55,14 @@ export default function App() {
         {/* Fallback */}
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
+    </>
+  );
+}
+
+export default function App() {
+  return (
+    <BrowserRouter>
+      <AppContent />
     </BrowserRouter>
   );
 }

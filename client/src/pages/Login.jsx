@@ -81,7 +81,12 @@ export default function Login() {
           type="email"
           placeholder="you@example.com"
           value={email}
-          onChange={(e) => setEmail(e.target.value)}
+          onChange={(e) => {
+            const val = e.target.value;
+            setEmail(val);
+            if (errors.email && val) setErrors((prev) => ({ ...prev, email: null }));
+            if (alert) setAlert(null);
+          }}
           error={errors.email}
           required
           autoComplete="email"
@@ -92,7 +97,12 @@ export default function Login() {
           type="password"
           placeholder="••••••••"
           value={password}
-          onChange={(e) => setPassword(e.target.value)}
+          onChange={(e) => {
+            const val = e.target.value;
+            setPassword(val);
+            if (errors.password && val) setErrors((prev) => ({ ...prev, password: null }));
+            if (alert) setAlert(null);
+          }}
           error={errors.password}
           required
           autoComplete="current-password"

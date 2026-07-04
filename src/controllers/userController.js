@@ -10,7 +10,7 @@ const getMyBookings = async (req, res) => {
   try {
     // Reserved seating tickets booked by this user
     const tickets = await Ticket.find({ bookedBy: req.user._id, status: 'BOOKED' })
-      .populate({ path: 'event', select: 'title date venue category eventType status imageUrl' })
+      .populate({ path: 'event', select: 'title date venue category eventType status hasImage' })
       .sort({ createdAt: -1 })
       .lean();
 
@@ -21,6 +21,7 @@ const getMyBookings = async (req, res) => {
       if (!t.event) continue;
       const eId = t.event._id.toString();
       if (!eventMap[eId]) {
+        if (t.event.hasImage) t.event.imageUrl = `/api/events/${eId}/image`;
         eventMap[eId] = {
           event:         t.event,
           type:          'RESERVED_SEATING',
@@ -61,7 +62,7 @@ const getMyBookings = async (req, res) => {
     return res.status(200).json({ success: true, data: { bookings } });
   } catch (error) {
     console.error('[UserController] getMyBookings error:', error);
-    return res.status(500).json({ success: false, message: 'Server error' });
+    return res.status(500).json({ success: false, message: 'An unexpected error occurred. Please try again later.' });
   }
 };
 
@@ -82,7 +83,7 @@ const getProfile = async (req, res) => {
     });
   } catch (error) {
     console.error('[UserController] getProfile error:', error);
-    return res.status(500).json({ success: false, message: 'Server error' });
+    return res.status(500).json({ success: false, message: 'An unexpected error occurred. Please try again later.' });
   }
 };
 
@@ -123,7 +124,7 @@ const updateProfile = async (req, res) => {
       return res.status(400).json({ success: false, message: messages.join(', ') });
     }
     console.error('[UserController] updateProfile error:', error);
-    return res.status(500).json({ success: false, message: 'Server error' });
+    return res.status(500).json({ success: false, message: 'An unexpected error occurred. Please try again later.' });
   }
 };
 
@@ -152,7 +153,7 @@ const changePassword = async (req, res) => {
     return res.status(200).json({ success: true, message: 'Password changed successfully' });
   } catch (error) {
     console.error('[UserController] changePassword error:', error);
-    return res.status(500).json({ success: false, message: 'Server error' });
+    return res.status(500).json({ success: false, message: 'An unexpected error occurred. Please try again later.' });
   }
 };
 

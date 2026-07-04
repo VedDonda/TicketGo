@@ -11,6 +11,10 @@ export default defineConfig({
         target: 'http://localhost:5000',
         changeOrigin: true,
       },
+      '/uploads': {
+        target: 'http://localhost:5000',
+        changeOrigin: true,
+      },
       // Note: Socket.IO connects directly to port 5000 (see BookingModal.jsx)
       // to avoid conflicts with Vite's own HMR WebSocket.
     },

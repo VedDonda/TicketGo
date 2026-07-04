@@ -1,15 +1,11 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Link, useParams, useNavigate } from 'react-router-dom';
 import { getCurrentUser, clearSession } from '../services/authService';
 import { fetchEventById } from '../services/eventService';
 import { fetchMyEventTickets } from '../services/userService';
 
 // ─── Icons ────────────────────────────────────────────────────────────────────
-const TicketIcon = () => (
-  <svg viewBox="0 0 24 24" fill="white" width="18" height="18">
-    <path d="M22 9V7a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v2a2 2 0 0 1 0 4v2a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-2a2 2 0 0 1 0-4z" />
-  </svg>
-);
+
 const CalIcon = () => (
   <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
     <rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
@@ -45,7 +41,7 @@ const CATEGORY_COLORS = {
   CONFERENCE: { bg: 'rgba(59,130,246,0.12)', border: 'rgba(59,130,246,0.35)', text: '#60a5fa' },
   OTHER:      { bg: 'rgba(107,114,128,0.12)',border: 'rgba(107,114,128,0.35)',text: '#9ca3af' },
 };
-const CAT_EMOJI = { MUSIC:'🎵', SPORTS:'🏆', COMEDY:'😂', THEATRE:'🎭', CONFERENCE:'💼', OTHER:'🎪' };
+
 
 const formatDate = (iso) =>
   new Date(iso).toLocaleDateString('en-IN', {
@@ -66,6 +62,35 @@ export default function EventDetail() {
   const [loading,         setLoading]         = useState(true);
   const [error,           setError]           = useState(null);
   const [myTickets,       setMyTickets]       = useState(null); // null = not loaded yet
+  const [imageUploading,  setImageUploading]  = useState(false);
+  const fileInputRef = useRef(null);
+
+  const handleImageChange = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    setImageUploading(true);
+    try {
+      const { uploadImageRequest, updateEventImageRequest } = await import('../services/eventService');
+      const uploadRes = await uploadImageRequest(file);
+      if (uploadRes.ok && uploadRes.data.success) {
+        const newImageUrl = uploadRes.data.data.url;
+        const updateRes = await updateEventImageRequest(event._id, newImageUrl);
+        if (updateRes.ok && updateRes.data.success) {
+          setEvent(prev => ({ ...prev, imageUrl: newImageUrl }));
+          alert('Image updated successfully!');
+        } else {
+          alert(updateRes.data.message || 'Failed to update event image');
+        }
+      } else {
+        alert(uploadRes.data.message || 'Image upload failed');
+      }
+    } catch (err) {
+      alert('Network error during image update.');
+    } finally {
+      setImageUploading(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+  };
 
   useEffect(() => {
     (async () => {
@@ -142,36 +167,15 @@ export default function EventDetail() {
   })();
 
   return (
-    <div style={{ minHeight: '100vh', fontFamily: 'Inter, sans-serif', background: '#0d0d0f', color: '#f0f0f5' }}>
+    <div style={{ minHeight: '100vh', fontFamily: 'Inter, sans-serif', background: '#0a0a0d', color: '#f0f0f5', position: 'relative' }}>
 
-      {/* ── Navbar ──────────────────────────────────────────────────────── */}
-      <nav style={{
-        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        padding: '0 40px', height: 64, background: 'rgba(13,13,15,0.95)',
-        backdropFilter: 'blur(12px)', borderBottom: '1px solid #2a2a35',
-        position: 'sticky', top: 0, zIndex: 50,
-      }}>
-        <Link to="/" style={{ display: 'flex', alignItems: 'center', gap: 10, textDecoration: 'none' }}>
-          <div style={{ width: 34, height: 34, background: '#5b5fc7', borderRadius: 9,
-            display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <TicketIcon />
-          </div>
-          <span style={{ fontSize: '1.1rem', fontWeight: 800, color: '#f0f0f5' }}>TicketGo</span>
-        </Link>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <Link to="/profile" style={{ display: 'flex', alignItems: 'center', gap: 6,
-            textDecoration: 'none', color: '#f0f0f5' }}>
-            <div style={{ width: 30, height: 30, borderRadius: '50%', background: '#5b5fc7',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              fontWeight: 700, fontSize: '0.8rem', color: '#fff' }}>{initial}</div>
-            <span style={{ fontSize: '0.875rem', color: '#f0f0f5' }}>{user?.name}</span>
-          </Link>
-          <button onClick={handleLogout} style={{
-            padding: '6px 14px', background: 'transparent', border: '1px solid #2a2a35',
-            color: '#8888a0', borderRadius: 8, fontSize: '0.8rem', cursor: 'pointer', fontFamily: 'Inter,sans-serif',
-          }}>Logout</button>
-        </div>
-      </nav>
+      {/* Ambient background glow */}
+      <div style={{
+        position: 'fixed', inset: 0, pointerEvents: 'none',
+        background: 'radial-gradient(circle at 50% 0%, rgba(91,95,199,0.15) 0%, transparent 60%)'
+      }} />
+
+
 
       {/* ── Hero banner ─────────────────────────────────────────────────── */}
       <div style={{
@@ -205,15 +209,62 @@ export default function EventDetail() {
           transition: 'color 0.2s',
         }}>← Back to Events</Link>
 
-        {/* Status badge */}
-        <span style={{
-          position: 'absolute', top: 20, right: 24,
-          background: event.status === 'PUBLISHED' ? 'rgba(78,202,139,0.15)' : 'rgba(245,158,11,0.15)',
-          border: event.status === 'PUBLISHED' ? '1px solid rgba(78,202,139,0.4)' : '1px solid rgba(245,158,11,0.4)',
-          color: event.status === 'PUBLISHED' ? '#4eca8b' : '#fbbf24',
-          borderRadius: 20, fontSize: '0.72rem', fontWeight: 700, padding: '4px 12px',
-          textTransform: 'uppercase', letterSpacing: '0.5px',
-        }}>{event.status}</span>
+        {/* Top-Right Badges/Actions */}
+        <div style={{ position: 'absolute', top: 20, right: 24, display: 'flex', gap: 10, alignItems: 'center' }}>
+          {user?.role === 'ADMIN' && (
+            <button
+              onClick={async () => {
+                if (!window.confirm('Are you sure you want to delete this event? This action cannot be undone.')) return;
+                try {
+                  const { deleteEventRequest } = await import('../services/eventService');
+                  const { ok, data } = await deleteEventRequest(event._id);
+                  if (ok && data.success) {
+                    alert('Event deleted successfully');
+                    navigate('/');
+                  } else {
+                    alert(data.message || 'Failed to delete event');
+                  }
+                } catch {
+                  alert('Network error. Failed to delete event.');
+                }
+              }}
+              style={{
+                background: 'rgba(239,68,68,0.2)', border: '1px solid rgba(239,68,68,0.5)', color: '#f87171',
+                borderRadius: 20, fontSize: '0.72rem', fontWeight: 700, padding: '4px 12px',
+                textTransform: 'uppercase', letterSpacing: '0.5px', cursor: 'pointer', transition: 'all 0.2s'
+              }}
+              onMouseEnter={e => { e.currentTarget.style.background = 'rgba(239,68,68,0.8)'; e.currentTarget.style.color = '#fff'; }}
+              onMouseLeave={e => { e.currentTarget.style.background = 'rgba(239,68,68,0.2)'; e.currentTarget.style.color = '#f87171'; }}
+            >
+              Delete Event
+            </button>
+          )}
+          {(user?.id === event?.organizer?._id || user?.role === 'ADMIN') && (
+            <>
+              <input type="file" accept="image/*" ref={fileInputRef} style={{ display: 'none' }} onChange={handleImageChange} />
+              <button
+                onClick={() => fileInputRef.current?.click()}
+                disabled={imageUploading}
+                style={{
+                  background: 'rgba(91,95,199,0.2)', border: '1px solid rgba(91,95,199,0.5)', color: '#8084e8',
+                  borderRadius: 20, fontSize: '0.72rem', fontWeight: 700, padding: '4px 12px',
+                  textTransform: 'uppercase', letterSpacing: '0.5px', cursor: imageUploading ? 'not-allowed' : 'pointer', transition: 'all 0.2s'
+                }}
+                onMouseEnter={e => { e.currentTarget.style.background = 'rgba(91,95,199,0.8)'; e.currentTarget.style.color = '#fff'; }}
+                onMouseLeave={e => { e.currentTarget.style.background = 'rgba(91,95,199,0.2)'; e.currentTarget.style.color = '#8084e8'; }}
+              >
+                {imageUploading ? 'Uploading...' : 'Change Image'}
+              </button>
+            </>
+          )}
+          <span style={{
+            background: event.status === 'PUBLISHED' ? 'rgba(78,202,139,0.15)' : 'rgba(245,158,11,0.15)',
+            border: event.status === 'PUBLISHED' ? '1px solid rgba(78,202,139,0.4)' : '1px solid rgba(245,158,11,0.4)',
+            color: event.status === 'PUBLISHED' ? '#4eca8b' : '#fbbf24',
+            borderRadius: 20, fontSize: '0.72rem', fontWeight: 700, padding: '4px 12px',
+            textTransform: 'uppercase', letterSpacing: '0.5px',
+          }}>{event.status}</span>
+        </div>
       </div>
 
       {/* ── Main content ────────────────────────────────────────────────── */}
@@ -251,7 +302,7 @@ export default function EventDetail() {
               { icon: <SeatIcon />, label: 'Total Capacity', value: totalCapacity.toLocaleString('en-IN') },
             ].map(({ icon, label, value }) => (
               <div key={label} style={{
-                background: '#161619', border: '1px solid #2a2a35', borderRadius: 10, padding: '12px 16px',
+                background: 'rgba(17,17,22,0.6)', border: '1px solid rgba(255,255,255,0.05)', backdropFilter: 'blur(10px)', borderRadius: 10, padding: '12px 16px',
                 display: 'flex', alignItems: 'flex-start', gap: 10,
               }}>
                 <span style={{ color: '#5b5fc7', marginTop: 2, flexShrink: 0 }}>{icon}</span>
@@ -264,7 +315,7 @@ export default function EventDetail() {
           </div>
 
           {/* Description */}
-          <div style={{ background: '#161619', border: '1px solid #2a2a35', borderRadius: 12, padding: '24px', marginBottom: 28 }}>
+          <div style={{ background: 'rgba(17,17,22,0.6)', border: '1px solid rgba(255,255,255,0.05)', backdropFilter: 'blur(10px)', borderRadius: 12, padding: '24px', marginBottom: 28 }}>
             <h2 style={{ margin: '0 0 14px', fontSize: '1rem', fontWeight: 700, color: '#8084e8' }}>About this event</h2>
             <p style={{ margin: 0, color: '#8888a0', lineHeight: 1.75, fontSize: '0.9rem', whiteSpace: 'pre-wrap' }}>
               {event.description}
@@ -273,7 +324,7 @@ export default function EventDetail() {
 
           {/* Seating / Zones breakdown */}
           {event.eventType === 'RESERVED_SEATING' && event.seatingConfig?.length > 0 && (
-            <div style={{ background: '#161619', border: '1px solid #2a2a35', borderRadius: 12, padding: '24px' }}>
+            <div style={{ background: 'rgba(17,17,22,0.6)', border: '1px solid rgba(255,255,255,0.05)', backdropFilter: 'blur(10px)', borderRadius: 12, padding: '24px' }}>
               <h2 style={{ margin: '0 0 16px', fontSize: '1rem', fontWeight: 700, color: '#8084e8', display: 'flex', alignItems: 'center', gap: 8 }}>
                 <SeatIcon /> Seating Sections
               </h2>
@@ -301,7 +352,7 @@ export default function EventDetail() {
           )}
 
           {event.eventType === 'ZONED_CAPACITY' && event.zoningConfig?.length > 0 && (
-            <div style={{ background: '#161619', border: '1px solid #2a2a35', borderRadius: 12, padding: '24px' }}>
+            <div style={{ background: 'rgba(17,17,22,0.6)', border: '1px solid rgba(255,255,255,0.05)', backdropFilter: 'blur(10px)', borderRadius: 12, padding: '24px' }}>
               <h2 style={{ margin: '0 0 16px', fontSize: '1rem', fontWeight: 700, color: '#8084e8', display: 'flex', alignItems: 'center', gap: 8 }}>
                 <ZoneIcon /> Zones
               </h2>
@@ -332,7 +383,7 @@ export default function EventDetail() {
         {/* ── Right column — Booking card ─────────────────────────── */}
         <div style={{ position: 'sticky', top: 84 }}>
           <div style={{
-            background: '#161619', border: '1px solid #2a2a35', borderRadius: 16, padding: 24,
+            background: 'rgba(17,17,22,0.6)', border: '1px solid rgba(255,255,255,0.05)', backdropFilter: 'blur(10px)', borderRadius: 16, padding: 24,
             boxShadow: '0 8px 40px rgba(0,0,0,0.4)',
           }}>
             {/* Price */}

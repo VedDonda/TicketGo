@@ -7,6 +7,7 @@ import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { getCurrentUser, clearSession, saveSession } from '../services/authService';
 import { fetchProfile, updateProfile, changePassword, fetchMyBookings } from '../services/userService';
+import { fetchMyCreatedEvents } from '../services/eventService';
 
 const formatPrice = (n) => `₹${Number(n).toLocaleString('en-IN')}`;
 const formatDate  = (iso) => new Date(iso).toLocaleDateString('en-IN', {
@@ -53,11 +54,7 @@ const CalIcon = () => (
   </svg>
 );
 
-const TABS = [
-  { id: 'bookings',  label: 'My Bookings', Icon: HistoryIcon },
-  { id: 'profile',   label: 'Profile',     Icon: UserIcon    },
-  { id: 'password',  label: 'Password',    Icon: LockIcon    },
-];
+
 
 export default function ProfilePage() {
   const navigate = useNavigate();
@@ -86,6 +83,10 @@ export default function ProfilePage() {
   const [bookingsLoading, setBookingsLoading] = useState(true);
   const [expandedEvent,   setExpandedEvent]   = useState(null);
 
+  // My Events state
+  const [myEvents,        setMyEvents]        = useState([]);
+  const [myEventsLoading, setMyEventsLoading] = useState(true);
+
   // ── Load profile ────────────────────────────────────────────────────────────
   useEffect(() => {
     (async () => {
@@ -113,6 +114,19 @@ export default function ProfilePage() {
       finally { setBookingsLoading(false); }
     })();
   }, []);
+
+  // ── Load my events ──────────────────────────────────────────────────────────
+  useEffect(() => {
+    if (localUser?.role !== 'ORGANIZER' && localUser?.role !== 'ADMIN') return;
+    (async () => {
+      setMyEventsLoading(true);
+      try {
+        const { ok, data } = await fetchMyCreatedEvents();
+        if (ok && data.success) setMyEvents(data.data.events || []);
+      } catch { /* silent */ }
+      finally { setMyEventsLoading(false); }
+    })();
+  }, [localUser?.role]);
 
   const handleLogout = () => { clearSession(); navigate('/login'); };
 
@@ -197,33 +211,13 @@ export default function ProfilePage() {
   return (
     <div style={{ minHeight: '100vh', fontFamily: 'Inter, sans-serif', background: '#0a0a0d', color: '#f0f0f5' }}>
 
-      {/* Navbar */}
-      <nav style={{
-        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        padding: '0 40px', height: 64, background: 'rgba(10,10,13,0.98)',
-        backdropFilter: 'blur(16px)', borderBottom: '1px solid #1e1e28',
-        position: 'sticky', top: 0, zIndex: 100,
-      }}>
-        <Link to="/" style={{ display: 'flex', alignItems: 'center', gap: 10, textDecoration: 'none' }}>
-          <div style={{ width: 34, height: 34, background: 'linear-gradient(135deg,#5b5fc7,#8084e8)', borderRadius: 9,
-            display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <TicketIcon />
-          </div>
-          <span style={{ fontSize: '1.1rem', fontWeight: 800, color: '#f0f0f5' }}>TicketGo</span>
-        </Link>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <div style={{ width: 30, height: 30, borderRadius: '50%', background: 'linear-gradient(135deg,#5b5fc7,#8084e8)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            fontWeight: 700, fontSize: '0.8rem', color: '#fff' }}>{initial}</div>
-          <span style={{ fontSize: '0.875rem', color: '#f0f0f5' }}>{localUser?.name}</span>
-          <button onClick={handleLogout} style={{
-            padding: '6px 14px', background: 'transparent', border: '1px solid #2a2a35',
-            color: '#8888a0', borderRadius: 8, fontSize: '0.8rem', cursor: 'pointer', fontFamily: 'Inter,sans-serif',
-          }}>Logout</button>
-        </div>
-      </nav>
+      {/* Ambient background glow */}
+      <div style={{
+        position: 'fixed', inset: 0, pointerEvents: 'none',
+        background: 'radial-gradient(circle at 50% 0%, rgba(91,95,199,0.15) 0%, transparent 60%)'
+      }} />
 
-      <div style={{ maxWidth: 960, margin: '0 auto', padding: '36px 24px 80px' }}>
+      <div style={{ maxWidth: 720, margin: '0 auto', padding: '36px 24px 80px', position: 'relative' }}>
 
         {/* Page header */}
         <div style={{ marginBottom: 32 }}>
@@ -250,11 +244,16 @@ export default function ProfilePage() {
 
         {/* Tabs */}
         <div style={{
-          display: 'flex', gap: 4, marginBottom: 24,
-          background: '#111116', border: '1px solid #1e1e28',
-          borderRadius: 12, padding: 4,
+          display: 'flex', gap: 6, marginBottom: 32,
+          background: 'rgba(17,17,22,0.6)', border: '1px solid rgba(255,255,255,0.05)', backdropFilter: 'blur(10px)',
+          borderRadius: 14, padding: 6,
         }}>
-          {TABS.map(({ id, label, Icon }) => (
+          {[
+            { id: 'bookings',  label: 'My Bookings', Icon: HistoryIcon },
+            ...(localUser?.role === 'ORGANIZER' || localUser?.role === 'ADMIN' ? [{ id: 'my-events', label: 'My Events', Icon: TicketIcon }] : []),
+            { id: 'profile',   label: 'Profile',     Icon: UserIcon    },
+            { id: 'password',  label: 'Password',    Icon: LockIcon    },
+          ].map(({ id, label, Icon }) => (
             <button
               key={id}
               onClick={() => setActiveTab(id)}
@@ -402,25 +401,100 @@ export default function ProfilePage() {
           </div>
         )}
 
+        {/* ── MY EVENTS TAB ────────────────────────────────────────────────────── */}
+        {activeTab === 'my-events' && (
+          <div>
+            {myEventsLoading ? (
+              <div style={{ textAlign: 'center', padding: '60px 0', color: '#55556a' }}>
+                Loading events...
+              </div>
+            ) : myEvents.length === 0 ? (
+              <div style={{
+                textAlign: 'center', padding: '60px 24px',
+                background: 'rgba(17,17,22,0.6)', border: '1px solid rgba(255,255,255,0.05)', backdropFilter: 'blur(10px)', borderRadius: 16,
+              }}>
+                <div style={{ fontSize: '1.1rem', fontWeight: 700, color: '#f0f0f5', marginBottom: 8 }}>
+                  No events created yet
+                </div>
+                <Link to="/events/create" style={{
+                  display: 'inline-block', marginTop: 12, padding: '10px 22px', background: 'linear-gradient(135deg,#5b5fc7,#8084e8)', color: '#fff',
+                  borderRadius: 8, textDecoration: 'none', fontWeight: 700, fontSize: '0.88rem',
+                }}>
+                  Create Event
+                </Link>
+              </div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                {myEvents.map((ev) => {
+                  const cs = CATEGORY_COLORS[ev.category] || CATEGORY_COLORS.OTHER;
+                  return (
+                    <Link
+                      to={`/events/${ev._id}/dashboard`}
+                      key={ev._id}
+                      style={{
+                        background: 'rgba(17,17,22,0.6)', border: '1px solid rgba(255,255,255,0.05)', backdropFilter: 'blur(10px)',
+                        borderRadius: 14, overflow: 'hidden', padding: '16px 20px', textDecoration: 'none',
+                        display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16,
+                        transition: 'border-color 0.2s',
+                      }}
+                      onMouseEnter={e => e.currentTarget.style.borderColor = '#5b5fc7'}
+                      onMouseLeave={e => e.currentTarget.style.borderColor = 'rgba(255,255,255,0.05)'}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 14, minWidth: 0 }}>
+                        {ev.imageUrl ? (
+                           <img src={ev.imageUrl} alt="" style={{ width: 44, height: 44, borderRadius: 8, objectFit: 'cover' }} />
+                        ) : (
+                           <div style={{ width: 44, height: 44, borderRadius: 8, background: cs.bg, border: `1px solid ${cs.text}`, display: 'flex', alignItems: 'center', justifyContent: 'center', color: cs.text, fontSize: '0.6rem', fontWeight: 700 }}>{ev.category}</div>
+                        )}
+                        <div style={{ minWidth: 0 }}>
+                          <div style={{ fontWeight: 700, color: '#f0f0f5', fontSize: '0.95rem',
+                            whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                            {ev.title}
+                          </div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 3 }}>
+                            <span style={{ color: '#55556a', fontSize: '0.73rem' }}><CalIcon /></span>
+                            <span style={{ color: '#55556a', fontSize: '0.75rem' }}>
+                              {ev.date ? formatDateTime(ev.date) : '—'}
+                            </span>
+                            <span style={{
+                              marginLeft: 6, padding: '2px 8px', borderRadius: 12, fontSize: '0.6rem', fontWeight: 800,
+                              background: ev.status === 'PUBLISHED' ? 'rgba(34,197,94,0.1)' : 'rgba(245,158,11,0.1)',
+                              color: ev.status === 'PUBLISHED' ? '#22c55e' : '#f59e0b'
+                            }}>{ev.status}</span>
+                          </div>
+                        </div>
+                      </div>
+                      <span style={{ color: '#8084e8', fontSize: '0.8rem', fontWeight: 700 }}>View ➝</span>
+                    </Link>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )}
+
         {/* ── PROFILE TAB ──────────────────────────────────────────────────────── */}
         {activeTab === 'profile' && (
           <div style={{
-            background: '#111116', border: '1px solid #1e1e28',
-            borderRadius: 16, padding: 28,
+            background: 'rgba(17,17,22,0.6)', border: '1px solid rgba(255,255,255,0.05)', backdropFilter: 'blur(10px)',
+            borderRadius: 16, padding: '32px 40px',
           }}>
-            <h2 style={{ margin: '0 0 24px', fontSize: '1rem', fontWeight: 700, color: '#8084e8' }}>
+            <h2 style={{ margin: '0 0 28px', fontSize: '1.15rem', fontWeight: 800, color: '#f0f0f5', letterSpacing: '0.3px' }}>
               Profile Information
             </h2>
 
             {profileLoading ? (
               <p style={{ color: '#55556a' }}>Loading...</p>
             ) : (
-              <form onSubmit={handleProfileSave} style={{ maxWidth: 440 }}>
+              <form onSubmit={handleProfileSave} style={{ display: 'flex', flexDirection: 'column' }}>
                 <div style={{ marginBottom: 16 }}>
                   <label style={labelStyle}>Full Name</label>
                   <input
                     value={editName}
-                    onChange={(e) => setEditName(e.target.value)}
+                    onChange={(e) => {
+                      setEditName(e.target.value);
+                      if (profileMsg) setProfileMsg(null);
+                    }}
                     required
                     style={inputStyle(false)}
                     onFocus={(e) => e.target.style.borderColor = '#5b5fc7'}
@@ -432,7 +506,10 @@ export default function ProfilePage() {
                   <input
                     type="email"
                     value={editEmail}
-                    onChange={(e) => setEditEmail(e.target.value)}
+                    onChange={(e) => {
+                      setEditEmail(e.target.value);
+                      if (profileMsg) setProfileMsg(null);
+                    }}
                     required
                     style={inputStyle(false)}
                     onFocus={(e) => e.target.style.borderColor = '#5b5fc7'}
@@ -484,20 +561,23 @@ export default function ProfilePage() {
         {/* ── PASSWORD TAB ─────────────────────────────────────────────────────── */}
         {activeTab === 'password' && (
           <div style={{
-            background: '#111116', border: '1px solid #1e1e28',
-            borderRadius: 16, padding: 28,
+            background: 'rgba(17,17,22,0.6)', border: '1px solid rgba(255,255,255,0.05)', backdropFilter: 'blur(10px)',
+            borderRadius: 16, padding: '32px 40px',
           }}>
-            <h2 style={{ margin: '0 0 24px', fontSize: '1rem', fontWeight: 700, color: '#8084e8' }}>
+            <h2 style={{ margin: '0 0 28px', fontSize: '1.15rem', fontWeight: 800, color: '#f0f0f5', letterSpacing: '0.3px' }}>
               Change Password
             </h2>
 
-            <form onSubmit={handlePasswordChange} style={{ maxWidth: 440 }}>
+            <form onSubmit={handlePasswordChange} style={{ display: 'flex', flexDirection: 'column' }}>
               <div style={{ marginBottom: 16 }}>
                 <label style={labelStyle}>Current Password</label>
                 <input
                   type="password"
                   value={curPwd}
-                  onChange={(e) => setCurPwd(e.target.value)}
+                  onChange={(e) => {
+                    setCurPwd(e.target.value);
+                    if (pwdMsg) setPwdMsg(null);
+                  }}
                   required
                   placeholder="Enter current password"
                   style={inputStyle(false)}
@@ -510,7 +590,13 @@ export default function ProfilePage() {
                 <input
                   type="password"
                   value={newPwd}
-                  onChange={(e) => setNewPwd(e.target.value)}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setNewPwd(val);
+                    if (pwdMsg?.type === 'error' && pwdMsg.text.includes('6 characters') && val.length >= 6) setPwdMsg(null);
+                    if (pwdMsg?.type === 'error' && pwdMsg.text.includes('match') && val === confirmPwd) setPwdMsg(null);
+                    if (pwdMsg?.type === 'success') setPwdMsg(null);
+                  }}
                   required
                   placeholder="At least 6 characters"
                   style={inputStyle(false)}
@@ -523,7 +609,12 @@ export default function ProfilePage() {
                 <input
                   type="password"
                   value={confirmPwd}
-                  onChange={(e) => setConfirmPwd(e.target.value)}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setConfirmPwd(val);
+                    if (pwdMsg?.type === 'error' && pwdMsg.text.includes('match') && val === newPwd) setPwdMsg(null);
+                    if (pwdMsg?.type === 'success') setPwdMsg(null);
+                  }}
                   required
                   placeholder="Repeat new password"
                   style={inputStyle(false)}

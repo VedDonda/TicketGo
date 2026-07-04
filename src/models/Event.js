@@ -115,10 +115,8 @@ const eventSchema = new mongoose.Schema(
       type: [zoningConfigSchema],
       default: undefined, // don't default to [] — only set when ZONED_CAPACITY
     },
-    imageUrl: {
-      type: String,
-      trim: true,
-    },
+    imageUrl: { type: String },
+    hasImage: { type: Boolean, default: false },
   },
   { timestamps: true }
 );

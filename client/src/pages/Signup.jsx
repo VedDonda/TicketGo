@@ -86,7 +86,12 @@ export default function Signup() {
           type="text"
           placeholder="John Doe"
           value={name}
-          onChange={(e) => setName(e.target.value)}
+          onChange={(e) => {
+            const val = e.target.value;
+            setName(val);
+            if (errors.name && val) setErrors((prev) => ({ ...prev, name: null }));
+            if (alert) setAlert(null);
+          }}
           error={errors.name}
           required
           autoComplete="name"
@@ -97,7 +102,12 @@ export default function Signup() {
           type="email"
           placeholder="you@example.com"
           value={email}
-          onChange={(e) => setEmail(e.target.value)}
+          onChange={(e) => {
+            const val = e.target.value;
+            setEmail(val);
+            if (errors.email && val) setErrors((prev) => ({ ...prev, email: null }));
+            if (alert) setAlert(null);
+          }}
           error={errors.email}
           required
           autoComplete="email"
@@ -108,7 +118,13 @@ export default function Signup() {
           type="password"
           placeholder="Min. 6 characters"
           value={password}
-          onChange={(e) => setPassword(e.target.value)}
+          onChange={(e) => {
+            const val = e.target.value;
+            setPassword(val);
+            if (errors.password && val.length >= 6) setErrors((prev) => ({ ...prev, password: null }));
+            if (errors.confirm && val === confirm) setErrors((prev) => ({ ...prev, confirm: null }));
+            if (alert) setAlert(null);
+          }}
           error={errors.password}
           required
           autoComplete="new-password"
@@ -119,7 +135,12 @@ export default function Signup() {
           type="password"
           placeholder="Re-enter your password"
           value={confirm}
-          onChange={(e) => setConfirm(e.target.value)}
+          onChange={(e) => {
+            const val = e.target.value;
+            setConfirm(val);
+            if (errors.confirm && val === password) setErrors((prev) => ({ ...prev, confirm: null }));
+            if (alert) setAlert(null);
+          }}
           error={errors.confirm}
           required
           autoComplete="new-password"
