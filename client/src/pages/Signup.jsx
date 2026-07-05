@@ -56,6 +56,13 @@ export default function Signup() {
     try {
       const { ok, data } = await signupRequest(name, email, password, role);
       if (!ok) { setAlert({ msg: data.message || 'Signup failed', type: 'err' }); return; }
+      
+      if (data.pending) {
+        setAlert({ msg: data.message, type: 'ok' });
+        setTimeout(() => navigate('/login'), 5000);
+        return;
+      }
+      
       saveSession(data);
       navigate('/');
     } catch {

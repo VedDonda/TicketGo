@@ -9,7 +9,7 @@ const {
   confirmPurchase,
   getMyTickets,
 } = require('../controllers/bookingController');
-const { protect, authorize } = require('../middleware/authMiddleware');
+const { protect, authorize, optionalAuth } = require('../middleware/authMiddleware');
 
 // ── Public routes ──────────────────────────────────────────────────────────────
 
@@ -19,8 +19,8 @@ router.get('/', getEvents);
 // GET /api/events/organizer/me → get events created by the logged-in organizer
 router.get('/organizer/me', protect, authorize('ORGANIZER', 'ADMIN'), getMyEvents);
 
-// GET /api/events/:id      → single event detail (public; DRAFT events hidden)
-router.get('/:id', getEventById);
+// GET /api/events/:id      → single event detail (public; DRAFT events hidden unless owner/admin)
+router.get('/:id', optionalAuth, getEventById);
 
 // GET  /api/events/:id/image → serve base64 image as binary HTTP response
 router.get('/:id/image', getEventImage);

@@ -429,14 +429,21 @@ export default function EventDetail() {
                 {myTickets.tickets.slice(0, 3).map((t) => (
                   <div key={t._id} style={{
                     display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                    padding: '6px 0', borderBottom: '1px solid rgba(34,197,94,0.08)',
+                    padding: '8px 0', borderBottom: '1px solid rgba(34,197,94,0.08)',
                   }}>
-                    <span style={{ fontSize: '0.8rem', color: '#f0f0f5' }}>
-                      {t.isZone ? `${t.quantity}x ${t.section}` : `${t.section} · Row ${t.row} · Seat ${t.seatNumber}`}
-                    </span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <span style={{ fontSize: '0.8rem', color: '#f0f0f5', fontWeight: 500 }}>
+                        {t.isZone ? `Zone ${t.section}` : `Sec ${t.section} · Row ${t.row} · Seat ${t.seatNumber}`}
+                      </span>
+                      {t.isZone && (
+                        <span style={{ fontSize: '0.7rem', background: 'rgba(34,197,94,0.1)', color: '#4eca8b', padding: '2px 6px', borderRadius: 4 }}>
+                          {t.quantity} Ticket{t.quantity > 1 ? 's' : ''}
+                        </span>
+                      )}
+                    </div>
                     <span style={{
                       fontSize: '0.65rem', fontWeight: 700, color: '#22c55e',
-                      background: 'rgba(34,197,94,0.1)', borderRadius: 4, padding: '2px 7px',
+                      background: 'rgba(34,197,94,0.1)', borderRadius: 4, padding: '3px 8px',
                     }}>Booked</span>
                   </div>
                 ))}

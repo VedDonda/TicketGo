@@ -69,4 +69,7 @@ ticketSchema.index(
 // Index for quickly fetching all available seats for an event
 ticketSchema.index({ event: 1, status: 1 });
 
+// Index for efficiently fetching a user's booked tickets
+ticketSchema.index({ bookedBy: 1, event: 1 });
+
 module.exports = mongoose.model('Ticket', ticketSchema);

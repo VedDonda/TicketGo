@@ -9,6 +9,7 @@ import EventDetail  from './pages/EventDetail';
 import BookingPage  from './pages/BookingPage';
 import ProfilePage  from './pages/ProfilePage';
 import OrganizerDashboard from './pages/OrganizerDashboard';
+import AdminDashboard from './pages/AdminDashboard';
 
 // Guard: redirect to /login if not authenticated
 function PrivateRoute({ children }) {
@@ -51,6 +52,9 @@ function AppContent() {
         } />
         <Route path="/profile" element={
           <PrivateRoute><ProfilePage /></PrivateRoute>
+        } />
+        <Route path="/admin/dashboard" element={
+          <PrivateRoute><AdminDashboard /></PrivateRoute>
         } />
         {/* Fallback */}
         <Route path="*" element={<Navigate to="/" replace />} />

@@ -31,5 +31,6 @@ const bookedZoneSchema = new mongoose.Schema(
 );
 
 bookedZoneSchema.index({ event: 1, bookedBy: 1 });
+bookedZoneSchema.index({ bookedBy: 1, event: 1 });
 
 module.exports = mongoose.model('BookedZone', bookedZoneSchema);

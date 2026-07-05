@@ -24,7 +24,7 @@ const S = {
   nav:     { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 40px', height: 64,
              background: 'rgba(13,13,15,0.95)', backdropFilter: 'blur(12px)', borderBottom: '1px solid #2a2a35',
              position: 'sticky', top: 0, zIndex: 50 },
-  body:    { maxWidth: 760, margin: '0 auto', padding: '48px 24px 80px' },
+  body:    { maxWidth: 960, margin: '0 auto', padding: '48px 24px 80px' },
 
   // Form
   card:    { background: '#161619', border: '1px solid #2a2a35', borderRadius: 16, padding: 28, marginBottom: 20 },
@@ -62,10 +62,10 @@ const S = {
              borderRadius: 6, color: '#e05c6a', cursor: 'pointer', display: 'flex', alignItems: 'center',
              justifyContent: 'center', transition: 'all 0.15s' },
   submitBtn: (loading) => ({
-    width: '100%', padding: '14px', background: loading ? '#3a3d7a' : '#5b5fc7', border: 'none',
-    borderRadius: 10, color: '#fff', fontSize: '1rem', fontWeight: 700, cursor: loading ? 'not-allowed' : 'pointer',
+    width: '100%', padding: '16px', background: loading ? '#3a3d7a' : '#5b5fc7', border: 'none',
+    borderRadius: 12, color: '#fff', fontSize: '1.1rem', fontWeight: 700, cursor: loading ? 'not-allowed' : 'pointer',
     fontFamily: 'Inter, sans-serif', transition: 'all 0.2s', marginTop: 8,
-    opacity: loading ? 0.75 : 1,
+    opacity: loading ? 0.75 : 1, pointerEvents: loading ? 'none' : 'auto'
   }),
   alert: (type) => ({
     padding: '12px 18px', borderRadius: 8, fontSize: '0.875rem', fontWeight: 500, marginBottom: 20,
@@ -162,6 +162,7 @@ export default function CreateEvent() {
       const { ok, data } = await uploadImageRequest(file);
       if (ok && data.success) {
         setImageUrl(data.data.url);
+        if (errors.image) setErrors(prev => ({ ...prev, image: null }));
       } else {
         setAlert({ msg: data.message || 'Image upload failed', type: 'err' });
       }
@@ -185,6 +186,7 @@ export default function CreateEvent() {
     if (!venueAddress.trim())  e.venueAddress= 'Address is required';
     if (!venueCapacity || isNaN(venueCapacity) || +venueCapacity < 1)
       e.venueCapacity = 'Total capacity must be at least 1';
+    if (!imageUrl) e.image = 'An event cover image is required';
 
     if (eventType === 'RESERVED_SEATING') {
       seatingConfig.forEach((s, i) => {
@@ -249,13 +251,14 @@ export default function CreateEvent() {
       const { ok, data } = await createEventRequest(payload);
       if (!ok) {
         setAlert({ msg: data.message || 'Failed to create event', type: 'err' });
+        setLoading(false);
+        isSubmitting.current = false;
         return;
       }
       setAlert({ msg: 'Event created successfully! Redirecting...', type: 'ok' });
       setTimeout(() => navigate('/'), 1800);
     } catch {
       setAlert({ msg: 'Network error. Make sure the backend server is running.', type: 'err' });
-    } finally {
       setLoading(false);
       isSubmitting.current = false;
     }
@@ -346,18 +349,15 @@ export default function CreateEvent() {
               </div>
             </div>
 
-            <div style={S.row2}>
-              {fld('ev-img', 'Cover Image URL (optional)', 'input', {
-                type: 'url', placeholder: 'https://...',
-                value: imageUrl, onChange: e => { setImageUrl(e.target.value); if (alert) setAlert(null); },
-                onFocus: focusStyle, onBlur: blurStyle,
-              }, null)}
-              <div>
-                <label style={S.label}>Or Upload Image File</label>
+            <div style={{ marginBottom: 18 }}>
+              <label style={S.label}>Event Cover Image *</label>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
                 <input type="file" accept="image/*" onChange={handleImageUpload} disabled={imageUploading}
-                  style={{ ...S.input, padding: '8px 14px' }} />
-                {imageUploading && <p style={{ fontSize: '0.76rem', color: '#8084e8', marginTop: 5 }}>Uploading...</p>}
+                  style={{ ...S.input, flex: 1, padding: '10px 14px' }} />
+                {imageUrl && <span style={{ color: '#4eca8b', fontSize: '0.85rem', fontWeight: 600 }}>✓ Uploaded</span>}
               </div>
+              {imageUploading && <p style={{ fontSize: '0.76rem', color: '#8084e8', marginTop: 5 }}>Uploading...</p>}
+              {errors.image && <p style={S.err}>{errors.image}</p>}
             </div>
           </div>
 
@@ -573,7 +573,7 @@ export default function CreateEvent() {
             </div>
           </div>
 
-          <button id="submit-event" type="submit" disabled={loading} style={S.submitBtn(loading)}>
+          <button id="submit-event" type="submit" disabled={loading || imageUploading} style={S.submitBtn(loading || imageUploading)}>
             {loading ? 'Creating Event...' : status === 'DRAFT' ? 'Save as Draft' : 'Create & Publish Event'}
           </button>
         </form>

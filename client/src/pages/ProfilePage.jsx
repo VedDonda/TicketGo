@@ -303,6 +303,7 @@ export default function ProfilePage() {
                 {bookings.map((booking) => {
                   const cs  = CATEGORY_COLORS[booking.event?.category] || CATEGORY_COLORS.OTHER;
                   const isOpen = expandedEvent === booking.event?._id?.toString();
+                  const totalTickets = booking.tickets?.reduce((acc, t) => acc + (t.isZone ? t.quantity : 1), 0) || 0;
                   return (
                     <div
                       key={booking.event?._id}
@@ -343,7 +344,7 @@ export default function ProfilePage() {
                         <div style={{ display: 'flex', alignItems: 'center', gap: 16, flexShrink: 0 }}>
                           <div style={{ textAlign: 'right' }}>
                             <div style={{ fontSize: '0.7rem', color: '#55556a', marginBottom: 2 }}>
-                              {booking.tickets?.length || 0} ticket{(booking.tickets?.length || 0) !== 1 ? 's' : ''}
+                              {totalTickets} ticket{totalTickets !== 1 ? 's' : ''}
                             </div>
                             <div style={{ fontSize: '1rem', fontWeight: 800, color: '#f0f0f5' }}>
                               {formatPrice(booking.totalPrice)}
@@ -360,19 +361,32 @@ export default function ProfilePage() {
                             textTransform: 'uppercase', letterSpacing: '0.6px', marginBottom: 10 }}>
                             Tickets
                           </div>
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 14 }}>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 16 }}>
                             {booking.tickets.map((t) => (
                               <div key={t._id} style={{
                                 display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                                padding: '8px 12px', background: '#0d0d10',
+                                padding: '10px 14px', background: '#0d0d10',
                                 border: '1px solid #1e1e28', borderRadius: 8,
                               }}>
-                                <span style={{ fontSize: '0.85rem', color: '#f0f0f5' }}>
-                                  {t.isZone ? `${t.quantity}x ${t.section}` : `${t.section} · Row ${t.row} · Seat ${t.seatNumber}`}
-                                </span>
-                                <span style={{ fontSize: '0.85rem', color: '#8084e8', fontWeight: 700 }}>
-                                  {formatPrice(t.price)}
-                                </span>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                                  <span style={{ fontSize: '0.85rem', color: '#f0f0f5', fontWeight: 500 }}>
+                                    {t.isZone ? `Zone ${t.section}` : `Sec ${t.section} · Row ${t.row} · Seat ${t.seatNumber}`}
+                                  </span>
+                                  {t.isZone && (
+                                    <span style={{ fontSize: '0.7rem', background: '#2a2a35', color: '#f0f0f5', padding: '2px 6px', borderRadius: 4 }}>
+                                      {t.quantity} Ticket{t.quantity > 1 ? 's' : ''}
+                                    </span>
+                                  )}
+                                </div>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                                  <span style={{ fontSize: '0.85rem', color: '#8084e8', fontWeight: 700 }}>
+                                    {formatPrice(t.price)}
+                                  </span>
+                                  <span style={{
+                                    fontSize: '0.65rem', fontWeight: 700, color: '#22c55e',
+                                    background: 'rgba(34,197,94,0.1)', borderRadius: 4, padding: '3px 8px',
+                                  }}>Booked</span>
+                                </div>
                               </div>
                             ))}
                           </div>

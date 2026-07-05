@@ -35,6 +35,15 @@ export default function Navbar() {
       <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
         {user ? (
           <>
+            {user.role === 'ADMIN' && (
+              <Link to="/admin/dashboard" style={{
+                padding: '7px 16px', background: 'rgba(78,202,139,0.15)',
+                border: '1px solid rgba(78,202,139,0.3)', color: '#4eca8b',
+                borderRadius: '8px', fontSize: '0.83rem', fontWeight: 700, textDecoration: 'none',
+              }}>
+                Admin Dashboard
+              </Link>
+            )}
             {(user.role === 'ORGANIZER' || user.role === 'ADMIN') && (
               <Link to="/events/create" style={{
                 padding: '7px 16px', background: 'rgba(91,95,199,0.15)',

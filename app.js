@@ -7,6 +7,7 @@ const authRoutes  = require('./src/routes/authRoutes');
 const eventRoutes = require('./src/routes/eventRoutes');
 const userRoutes  = require('./src/routes/userRoutes');
 const uploadRoutes = require('./src/routes/uploadRoutes');
+const adminRoutes = require('./src/routes/adminRoutes');
 
 const app = express();
 
@@ -25,6 +26,7 @@ app.use('/api/auth',   authRoutes);
 app.use('/api/events', eventRoutes);
 app.use('/api/users',  userRoutes);
 app.use('/api/upload', uploadRoutes);
+app.use('/api/admin',  adminRoutes);
 
 // 404 fallback for unknown API routes
 app.use((req, res) => {

@@ -20,7 +20,12 @@ export const fetchEvents = async (params = {}) => {
  * Fetch a single event by ID.
  */
 export const fetchEventById = async (id) => {
-  const res = await fetch(`${API}/${id}`);
+  const token = localStorage.getItem('tg_token');
+  const headers = {};
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+  const res = await fetch(`${API}/${id}`, { headers });
   return res.json().then((data) => ({ ok: res.ok, data }));
 };
 

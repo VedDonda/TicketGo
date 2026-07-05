@@ -41,7 +41,15 @@ const signup = async (req, res) => {
     const allowedRoles = ['CUSTOMER', 'ORGANIZER'];
     const userRole = allowedRoles.includes(role) ? role : 'CUSTOMER';
 
-    const user = await User.create({ name, email, password, role: userRole });
+    const user = await User.create({ name, email, password, role: userRole, isVerified: userRole !== 'ORGANIZER' });
+
+    if (userRole === 'ORGANIZER') {
+      return res.status(201).json({
+        success: true,
+        pending: true,
+        message: 'Registration successful. Your organizer account is pending admin approval. You will be able to log in once approved.',
+      });
+    }
 
     sendTokenResponse(user, 201, res);
   } catch (error) {
@@ -75,6 +83,10 @@ const login = async (req, res) => {
     const isMatch = await user.comparePassword(password);
     if (!isMatch) {
       return res.status(401).json({ success: false, message: 'Invalid email or password' });
+    }
+
+    if (user.role === 'ORGANIZER' && !user.isVerified) {
+      return res.status(403).json({ success: false, message: 'Your organizer account is pending admin approval.' });
     }
 
     sendTokenResponse(user, 200, res);

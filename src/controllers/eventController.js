@@ -119,6 +119,7 @@ const getEvents = async (req, res) => {
     // ── Build filter ─────────────────────────────────────────────────────────
     const filter = {
       status: 'PUBLISHED',
+      date: { $gte: new Date() },
     };
 
     if (req.query.category) {

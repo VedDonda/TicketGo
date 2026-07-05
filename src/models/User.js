@@ -28,6 +28,10 @@ const userSchema = new mongoose.Schema(
       enum: ['CUSTOMER', 'ORGANIZER', 'ADMIN'],
       default: 'CUSTOMER',
     },
+    isVerified: {
+      type: Boolean,
+      default: false,
+    },
   },
   { timestamps: true }
 );
