@@ -17,22 +17,109 @@ const Event     = require('../models/Event');
 const Ticket    = require('../models/Ticket');
 const Inventory = require('../models/Inventory');
 const ZonedHold = require('../models/ZonedHold');
+const { getRedisClient } = require('../config/redis');
 
-const HOLD_MINUTES  = 10;
+const HOLD_MINUTES    = 10;
+const HOLD_SECONDS    = HOLD_MINUTES * 60;
 const MAX_SEAT_SELECT = 20;
+const SEAT_LOCK_PREFIX = 'seat:lock'; // Redis key namespace for seat locks
 
-// ─── Helper: get the Socket.IO instance attached to app ──────────────────────
+// ─── Helper: get the Socket.IO instance attached to app ──────────────────
 const getIO = (req) => req.app.get('io');
 
+// ─── Redis Seat Lock Helpers ────────────────────────────────────────────────
+// These helpers wrap Redis SET NX EX as a fast in-memory pre-check before the
+// MongoDB findOneAndUpdate. If Redis is unavailable (null client), all helpers
+// return safe defaults so MongoDB remains the sole correctness guard.
+
+/** Build the Redis key string for a seat lock. */
+const seatLockKey = (eventId, section, row, seatNumber) =>
+  `${SEAT_LOCK_PREFIX}:${eventId}:${section}:${row}:${seatNumber}`;
+
+/**
+ * Try to acquire a Redis seat lock using SET NX EX.
+ *   NX = only set if key doesn’t exist (atomic).
+ *   EX = auto-expire after ttlSeconds (matches the hold window).
+ * Returns true  if acquired OR if Redis is unavailable (fall through to Mongo).
+ * Returns false if another user already holds this seat in Redis.
+ */
+const acquireSeatLock = async (redis, eventId, section, row, seatNumber, userId, ttlSeconds) => {
+  if (!redis) return true; // No Redis → let MongoDB be the guard
+  try {
+    const result = await redis.set(
+      seatLockKey(eventId, section, row, seatNumber),
+      userId.toString(),
+      'EX', ttlSeconds,
+      'NX'
+    );
+    return result === 'OK';
+  } catch (err) {
+    console.error('[Redis] acquireSeatLock error:', err.message);
+    return true; // Redis error → fallback to MongoDB guard
+  }
+};
+
+/** Release a single Redis seat lock (DEL). */
+const releaseSeatLock = async (redis, eventId, section, row, seatNumber) => {
+  if (!redis) return;
+  try {
+    await redis.del(seatLockKey(eventId, section, row, seatNumber));
+  } catch (err) {
+    console.error('[Redis] releaseSeatLock error:', err.message);
+  }
+};
+
+/**
+ * Release multiple seat locks in one bulk DEL.
+ * Used for rollback paths and hold-release flows.
+ * @param {Array<{section, row, seatNumber}>} seats
+ */
+const releaseSeatLocks = async (redis, eventId, seats) => {
+  if (!redis || seats.length === 0) return;
+  try {
+    const keys = seats.map(({ section, row, seatNumber }) =>
+      seatLockKey(eventId, section, row, seatNumber)
+    );
+    await redis.del(...keys);
+  } catch (err) {
+    console.error('[Redis] releaseSeatLocks error:', err.message);
+  }
+};
+
+
 // ─── Helper: lazy-expire stale HELD tickets ───────────────────────────────────
-const releaseExpiredTickets = async (eventId) => {
+/**
+ * Finds tickets whose heldUntil has passed, releases them back to AVAILABLE,
+ * and deletes their Redis lock keys (if Redis is available).
+ */
+const releaseExpiredTickets = async (eventId, redis = null) => {
   const now = new Date();
+
+  // If Redis is available, collect expired ticket coordinates before the bulk update
+  // so we can DEL their lock keys. Lock keys may already be expired on Redis side
+  // (same TTL), but explicit DEL avoids any clock-skew window.
+  if (redis) {
+    try {
+      const expiredTickets = await Ticket.find(
+        { event: eventId, status: 'HELD', heldUntil: { $lt: now } },
+        'section row seatNumber'
+      ).lean();
+      if (expiredTickets.length > 0) {
+        await releaseSeatLocks(redis, eventId.toString(), expiredTickets);
+      }
+    } catch (err) {
+      console.error('[Redis] Error cleaning up lock keys for expired tickets:', err.message);
+      // Non-fatal — proceed with MongoDB cleanup regardless
+    }
+  }
+
   const result = await Ticket.updateMany(
     { event: eventId, status: 'HELD', heldUntil: { $lt: now } },
     { $set: { status: 'AVAILABLE', heldBy: null, heldUntil: null } }
   );
-  return result.modifiedCount; // how many were freed
+  return result.modifiedCount;
 };
+
 
 // ─── Helper: lazy-expire stale ZonedHolds and restore Inventory ───────────────
 const releaseExpiredZoneHolds = async (eventId) => {
@@ -60,8 +147,9 @@ const getSeats = async (req, res) => {
       return res.status(400).json({ success: false, message: 'This event uses zone-based seating' });
     }
 
-    // Lazy-expire stale holds
-    await releaseExpiredTickets(req.params.id);
+    // Lazy-expire stale holds (also cleans up Redis lock keys if Redis is available)
+    const redis = getRedisClient();
+    await releaseExpiredTickets(req.params.id, redis);
 
     const tickets = await Ticket.find({ event: req.params.id })
       .select('section row seatNumber status heldBy price')
@@ -153,12 +241,12 @@ const holdSeats = async (req, res) => {
     // ── RESERVED_SEATING path ─────────────────────────────────────────────────
     if (event.eventType === 'RESERVED_SEATING') {
       const { seats } = req.body;
+      const redis = getRedisClient(); // may be null — all lock helpers handle this gracefully
 
       // Release any stale holds before attempting to claim seats —
       // prevents false 409s from expired-but-not-yet-cleaned-up HELD tickets
-      const freed = await releaseExpiredTickets(req.params.id);
+      const freed = await releaseExpiredTickets(req.params.id, redis);
       if (freed > 0) {
-        // Notify all clients in the room so their seat maps refresh automatically
         io?.to(room).emit('seat:released', { eventId: req.params.id });
       }
 
@@ -172,17 +260,43 @@ const holdSeats = async (req, res) => {
         });
       }
 
-      // Release any existing holds by this user on this event first (replace flow)
+      // Release any existing holds by this user on this event (replace flow).
+      // Find them first so we can DEL their Redis lock keys.
+      if (redis) {
+        const existingHeld = await Ticket.find(
+          { event: req.params.id, heldBy: req.user._id, status: 'HELD' },
+          'section row seatNumber'
+        ).lean();
+        if (existingHeld.length > 0) {
+          await releaseSeatLocks(redis, req.params.id, existingHeld);
+        }
+      }
       await Ticket.updateMany(
         { event: req.params.id, heldBy: req.user._id, status: 'HELD' },
         { $set: { status: 'AVAILABLE', heldBy: null, heldUntil: null } }
       );
 
-      // Atomically claim each requested seat (only if AVAILABLE)
+      // Atomically claim each requested seat.
+      // Layer 1: Redis SET NX EX  — in-memory fast rejection (sub-millisecond)
+      // Layer 2: MongoDB findOneAndUpdate — correctness guard + source of truth
       const heldTickets = [];
       const failedSeats = [];
+      const redisLockedSeats = []; // track acquired locks for rollback
 
       for (const s of seats) {
+        // ─ Layer 1: Redis lock ─────────────────────────────────────────────
+        const lockAcquired = await acquireSeatLock(
+          redis, req.params.id, s.section, s.row, s.seatNumber,
+          req.user._id, HOLD_SECONDS
+        );
+        if (!lockAcquired) {
+          // Redis already has a lock — seat is held by another user
+          failedSeats.push(s);
+          continue;
+        }
+        redisLockedSeats.push(s); // track for rollback
+
+        // ─ Layer 2: MongoDB ───────────────────────────────────────────────
         const ticket = await Ticket.findOneAndUpdate(
           {
             event:      req.params.id,
@@ -201,17 +315,26 @@ const holdSeats = async (req, res) => {
           { returnDocument: 'after' }
         );
 
-        if (ticket) heldTickets.push(ticket);
-        else        failedSeats.push(s);
+        if (ticket) {
+          heldTickets.push(ticket);
+        } else {
+          // MongoDB says seat is not AVAILABLE (e.g. already BOOKED).
+          // Release the Redis lock we just acquired so others aren’t blocked.
+          await releaseSeatLock(redis, req.params.id, s.section, s.row, s.seatNumber);
+          redisLockedSeats.pop(); // remove from rollback list
+          failedSeats.push(s);
+        }
       }
 
-      // If any seat wasn't available, roll back the ones we did hold
+      // If any seat wasn’t available, roll back the ones we did hold
       if (failedSeats.length > 0) {
         const heldIds = heldTickets.map((t) => t._id);
         await Ticket.updateMany(
           { _id: { $in: heldIds } },
           { $set: { status: 'AVAILABLE', heldBy: null, heldUntil: null } }
         );
+        // Also release all Redis locks we acquired during this transaction
+        await releaseSeatLocks(redis, req.params.id, heldTickets);
         return res.status(409).json({
           success: false,
           message: 'One or more seats are no longer available',
@@ -366,6 +489,18 @@ const releaseHold = async (req, res) => {
     const room = `event:${req.params.id}`;
 
     if (event.eventType === 'RESERVED_SEATING') {
+      // Find the user’s held tickets before releasing, so we can DEL their Redis locks
+      const redis = getRedisClient();
+      if (redis) {
+        const heldTickets = await Ticket.find(
+          { event: req.params.id, heldBy: req.user._id, status: 'HELD' },
+          'section row seatNumber'
+        ).lean();
+        if (heldTickets.length > 0) {
+          await releaseSeatLocks(redis, req.params.id, heldTickets);
+        }
+      }
+
       const released = await Ticket.updateMany(
         { event: req.params.id, heldBy: req.user._id, status: 'HELD' },
         { $set: { status: 'AVAILABLE', heldBy: null, heldUntil: null } }
@@ -432,6 +567,15 @@ const confirmPurchase = async (req, res) => {
 
     if (event.eventType === 'RESERVED_SEATING') {
       const now = new Date();
+      // Find held tickets first — we need their coordinates to DEL Redis locks after confirm
+      const redis = getRedisClient();
+      const heldTickets = redis
+        ? await Ticket.find(
+            { event: req.params.id, heldBy: req.user._id, status: 'HELD', heldUntil: { $gte: now } },
+            'section row seatNumber'
+          ).lean()
+        : [];
+
       const result = await Ticket.updateMany(
         {
           event:     req.params.id,
@@ -454,6 +598,12 @@ const confirmPurchase = async (req, res) => {
           success: false,
           message: 'Your hold has expired. Please select your seats again.',
         });
+      }
+
+      // Ticket is now permanently BOOKED — release Redis lock keys.
+      // The seat is no longer in a transient state; no lock is needed.
+      if (redis && heldTickets.length > 0) {
+        await releaseSeatLocks(redis, req.params.id, heldTickets);
       }
 
       // Fetch confirmed tickets to return + broadcast

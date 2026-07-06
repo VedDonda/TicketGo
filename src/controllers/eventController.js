@@ -1,5 +1,6 @@
 const Event = require('../models/Event');
 const { generateSeatsForEvent } = require('../utils/seatGenerator');
+const { getSeatQueue } = require('../queues/seatQueue');
 
 // ─── POST /api/events ─────────────────────────────────────────────────────────
 
@@ -8,16 +9,20 @@ const { generateSeatsForEvent } = require('../utils/seatGenerator');
  * @route  POST /api/events
  * @access Private — ORGANIZER | ADMIN
  *
- * Flow:
+ * Flow (Redis available):
  *  1. Validate request body
- *  2. Save event as DRAFT
- *  3. Generate seats/inventory synchronously inline → event becomes PUBLISHED
- *  4. Optionally enqueue a BullMQ job if Redis is available (for large events / retries)
- *  5. Return 201 with the PUBLISHED event
+ *  2. Save event as DRAFT in MongoDB
+ *  3. Enqueue a BullMQ 'seat-generation' job — return 201 immediately
+ *  4. Worker calls generateSeatsForEvent() and publishes the event asynchronously
+ *  5. Worker emits Socket.IO `event:published` when done
  *
- * Why inline?  The worker process requires Redis to be running. Without it,
- * events would be stuck as DRAFT and never appear on the home page.
- * The synchronous path guarantees the event is always published immediately.
+ * Flow (Redis unavailable — graceful fallback):
+ *  1–2. Same as above
+ *  3. generateSeatsForEvent() runs synchronously on this request thread
+ *  4. Return 201 with the published event
+ *
+ * Why async?  For large events (e.g. 50,000 seats), the sync path can exceed
+ * HTTP timeout limits and blocks the Node event loop. BullMQ offloads the work.
  */
 const createEvent = async (req, res) => {
   try {
@@ -63,20 +68,29 @@ const createEvent = async (req, res) => {
       zoningConfig:  eventType === 'ZONED_CAPACITY'   ? zoningConfig  : undefined,
       imageUrl,
       hasImage: !!imageUrl && imageUrl.startsWith('data:image'),
-      status: 'DRAFT', // Always start as DRAFT
+      status: 'DRAFT',
     });
 
     const targetStatus = req.body.status === 'DRAFT' ? 'DRAFT' : 'PUBLISHED';
 
-    // ── Generate seats/inventory synchronously ───────────────────────────────
-    // This always runs — ensures the event gets its seats built immediately.
-    // The targetStatus determines if it stays DRAFT or goes live.
+    // ── Attempt async path via BullMQ ────────────────────────────────────────
+    const queue = getSeatQueue();
+    if (queue) {
+      await queue.add('generate', { eventId: event._id.toString(), targetStatus });
+      console.log(`[EventController] Event ${event._id} enqueued for async seat generation → ${targetStatus}`);
+
+      return res.status(201).json({
+        success: true,
+        message: `Event "${title}" created! Seats are being generated in the background and will be ${targetStatus} shortly.`,
+        data: { event },
+        async: true,
+      });
+    }
+
+    // ── Sync fallback (Redis unavailable) ────────────────────────────────────
     const { insertedCount } = await generateSeatsForEvent(event._id, targetStatus);
-    console.log(`[EventController] Event ${event._id} generated seats — Status: ${targetStatus}`);
+    console.log(`[EventController] Event ${event._id} generated seats synchronously — Status: ${targetStatus}`);
 
-
-
-    // ── Fetch the updated event to return to the client ──────────
     const updatedEvent = await Event.findById(event._id).populate('organizer', 'name').lean();
 
     return res.status(201).json({
@@ -351,7 +365,7 @@ const publishEvent = async (req, res) => {
   try {
     const event = await Event.findById(req.params.id);
     if (!event) return res.status(404).json({ success: false, message: 'Event not found' });
-    
+
     // Auth check
     if (event.organizer.toString() !== req.user._id.toString() && req.user.role !== 'ADMIN') {
       return res.status(403).json({ success: false, message: 'Not authorized to publish this event' });
@@ -361,6 +375,19 @@ const publishEvent = async (req, res) => {
       return res.status(400).json({ success: false, message: `Event is already ${event.status}` });
     }
 
+    // ── Attempt async path via BullMQ ────────────────────────────────────────
+    const queue = getSeatQueue();
+    if (queue) {
+      await queue.add('generate', { eventId: event._id.toString(), targetStatus: 'PUBLISHED' });
+      console.log(`[EventController] Event ${event._id} enqueued for async publish`);
+      return res.status(200).json({
+        success: true,
+        message: 'Event is being published. Seats are generating in the background.',
+        async: true,
+      });
+    }
+
+    // ── Sync fallback ────────────────────────────────────────────────────────
     const { insertedCount } = await generateSeatsForEvent(event._id, 'PUBLISHED');
     return res.status(200).json({ success: true, message: `Event published! ${insertedCount} records inserted.` });
   } catch (error) {

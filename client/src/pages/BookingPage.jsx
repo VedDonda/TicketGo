@@ -131,13 +131,27 @@ export default function BookingPage() {
   }, [startTimer]);
 
   // ── Cancel / back ─────────────────────────────────────────────────────────
-  const handleCancel = async () => {
+  // NOTE: This does NOT release the hold. The user may want to come back within
+  // the 10-minute window. The hold expires automatically via TTL / lazy expiry.
+  // If the user wants to change seats, they call handleChangeSeat instead.
+  const handleCancel = () => {
+    clearInterval(timerRef.current);
+    navigate(`/events/${id}`);
+  };
+
+  // Explicitly release + go back to seat selection (user actively wants to change)
+  const handleChangeSeat = async () => {
     clearInterval(timerRef.current);
     if (!releasedRef.current && holdData) {
       releasedRef.current = true;
       try { await releaseHold(event._id, {}); } catch { /* silent */ }
     }
-    navigate(`/events/${id}`);
+    // Reset state back to seat-selection stage — no navigation needed,
+    // we're already on /events/:id/book
+    setHoldData(null);
+    setTimeLeft(HOLD_SECONDS);
+    releasedRef.current = false;
+    setStage(STAGE.SELECTING);
   };
 
   // ── Confirm purchase ──────────────────────────────────────────────────────
@@ -412,6 +426,7 @@ export default function BookingPage() {
                       <div style={{ display: 'flex', gap: 10 }}>
                         <button
                           onClick={handleCancel}
+                          title="Go back without releasing your hold — seats stay reserved for you"
                           style={{
                             flex: 1, padding: '13px', background: 'transparent',
                             border: '1px solid #2a2a35', borderRadius: 10,
@@ -419,7 +434,19 @@ export default function BookingPage() {
                             cursor: 'pointer', fontFamily: 'Inter, sans-serif',
                           }}
                         >
-                          Cancel
+                          ← Back
+                        </button>
+                        <button
+                          onClick={handleChangeSeat}
+                          title="Release your current seats and go back to seat selection"
+                          style={{
+                            flex: 1, padding: '13px', background: 'transparent',
+                            border: '1px solid rgba(239,68,68,0.3)', borderRadius: 10,
+                            color: '#f87171', fontSize: '0.9rem', fontWeight: 700,
+                            cursor: 'pointer', fontFamily: 'Inter, sans-serif',
+                          }}
+                        >
+                          Change Seats
                         </button>
                         <button
                           onClick={handleConfirmPurchase}
