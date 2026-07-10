@@ -28,6 +28,15 @@ const userSchema = new mongoose.Schema(
       enum: ['CUSTOMER', 'ORGANIZER', 'ADMIN'],
       default: 'CUSTOMER',
     },
+    // isEmailVerified — set to true only after OTP email verification.
+    // Default: true so all existing DB users are treated as already verified.
+    // New signups: created with isEmailVerified: true only after OTP check.
+    isEmailVerified: {
+      type: Boolean,
+      default: true,
+    },
+    // isVerified — organizer admin approval flag (unrelated to email OTP).
+    // CUSTOMER: always true. ORGANIZER: false until admin approves.
     isVerified: {
       type: Boolean,
       default: false,

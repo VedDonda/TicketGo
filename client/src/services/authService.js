@@ -39,3 +39,21 @@ export const signupRequest = async (name, email, password, role) => {
   });
   return res.json().then((data) => ({ ok: res.ok, data }));
 };
+
+export const verifyOtpRequest = async (email, otp) => {
+  const res = await fetch(`${API}/verify-otp`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email, otp }),
+  });
+  return res.json().then((data) => ({ ok: res.ok, data }));
+};
+
+export const resendOtpRequest = async (email) => {
+  const res = await fetch(`${API}/resend-otp`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email }),
+  });
+  return res.json().then((data) => ({ ok: res.ok, data }));
+};

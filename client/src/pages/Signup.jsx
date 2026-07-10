@@ -3,7 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import AuthLayout from '../components/AuthLayout';
 import RoleToggle from '../components/RoleToggle';
 import FormField from '../components/FormField';
-import { signupRequest, saveSession } from '../services/authService';
+import { signupRequest, saveSession, verifyOtpRequest, resendOtpRequest } from '../services/authService';
 
 const ROLE_OPTIONS = [
   { label: 'Ticket Buyer', value: 'CUSTOMER' },
@@ -26,11 +26,17 @@ const authClasses = {
 export default function Signup() {
   const navigate = useNavigate();
 
+  // Step 1: Signup Details
   const [role,     setRole]     = useState('CUSTOMER');
   const [name,     setName]     = useState('');
   const [email,    setEmail]    = useState('');
   const [password, setPassword] = useState('');
   const [confirm,  setConfirm]  = useState('');
+  
+  // Step 2: OTP
+  const [step,     setStep]     = useState(1);
+  const [otp,      setOtp]      = useState('');
+
   const [errors,   setErrors]   = useState({});
   const [alert,    setAlert]    = useState(null);
   const [loading,  setLoading]  = useState(false);
@@ -45,7 +51,7 @@ export default function Signup() {
     return e;
   };
 
-  const handleSubmit = async (e) => {
+  const handleSignupSubmit = async (e) => {
     e.preventDefault();
     setAlert(null);
     const errs = validate();
@@ -55,16 +61,73 @@ export default function Signup() {
 
     try {
       const { ok, data } = await signupRequest(name, email, password, role);
-      if (!ok) { setAlert({ msg: data.message || 'Signup failed', type: 'err' }); return; }
+      if (!ok) { 
+        setAlert({ msg: data.message || 'Signup failed', type: 'err' }); 
+        return; 
+      }
       
-      if (data.pending) {
-        setAlert({ msg: data.message, type: 'ok' });
-        setTimeout(() => navigate('/login'), 5000);
+      // Success - Move to OTP step
+      setAlert({ msg: data.message, type: 'ok' });
+      setStep(2);
+    } catch {
+      setAlert({ msg: 'Network error. Please try again.', type: 'err' });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleOtpSubmit = async (e) => {
+    e.preventDefault();
+    if (!otp || otp.length < 6) {
+      setErrors({ otp: 'Please enter the 6-digit code' });
+      return;
+    }
+    
+    setAlert(null);
+    setErrors({});
+    setLoading(true);
+
+    try {
+      const { ok, data } = await verifyOtpRequest(email, otp);
+      if (!ok) {
+        setAlert({ msg: data.message || 'Verification failed', type: 'err' });
+        // If expired or too many attempts, go back to step 1
+        if (data.message.includes('expired') || data.message.includes('cleared')) {
+           setTimeout(() => {
+             setStep(1);
+             setOtp('');
+             setAlert(null);
+           }, 3000);
+        }
         return;
       }
       
-      saveSession(data);
-      navigate('/');
+      // Success!
+      if (role === 'ORGANIZER') {
+        // Organizer needs admin approval, no token returned yet
+        setAlert({ msg: data.message, type: 'ok' });
+        setTimeout(() => navigate('/login'), 5000);
+      } else {
+        // Customer gets token immediately
+        saveSession(data);
+        navigate('/');
+      }
+    } catch {
+      setAlert({ msg: 'Network error. Please try again.', type: 'err' });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleResend = async () => {
+    setAlert(null);
+    setLoading(true);
+    try {
+      const { ok, data } = await resendOtpRequest(email);
+      setAlert({ 
+        msg: data.message || (ok ? 'OTP resent' : 'Failed to resend'), 
+        type: ok ? 'ok' : 'err' 
+      });
     } catch {
       setAlert({ msg: 'Network error. Please try again.', type: 'err' });
     } finally {
@@ -74,11 +137,10 @@ export default function Signup() {
 
   return (
     <AuthLayout>
-      <h1 className={authClasses.title}>Create account</h1>
-      <p className={authClasses.subtitle}>Join thousands of event-goers today</p>
-
-      <p className={authClasses.roleLabel}>I am a</p>
-      <RoleToggle value={role} onChange={setRole} options={ROLE_OPTIONS} />
+      <h1 className={authClasses.title}>{step === 1 ? 'Create account' : 'Verify email'}</h1>
+      <p className={authClasses.subtitle}>
+        {step === 1 ? 'Join thousands of event-goers today' : `We sent a code to ${email}`}
+      </p>
 
       {alert && (
         <div className={`${authClasses.alertBase} ${alert.type === 'err' ? authClasses.alertErr : authClasses.alertOk}`}>
@@ -86,82 +148,133 @@ export default function Signup() {
         </div>
       )}
 
-      <form onSubmit={handleSubmit} noValidate>
-        <FormField
-          id="signup-name"
-          label="Full Name"
-          type="text"
-          placeholder="John Doe"
-          value={name}
-          onChange={(e) => {
-            const val = e.target.value;
-            setName(val);
-            if (errors.name && val) setErrors((prev) => ({ ...prev, name: null }));
-            if (alert) setAlert(null);
-          }}
-          error={errors.name}
-          required
-          autoComplete="name"
-        />
-        <FormField
-          id="signup-email"
-          label="Email"
-          type="email"
-          placeholder="you@example.com"
-          value={email}
-          onChange={(e) => {
-            const val = e.target.value;
-            setEmail(val);
-            if (errors.email && val) setErrors((prev) => ({ ...prev, email: null }));
-            if (alert) setAlert(null);
-          }}
-          error={errors.email}
-          required
-          autoComplete="email"
-        />
-        <FormField
-          id="signup-password"
-          label="Password"
-          type="password"
-          placeholder="Min. 6 characters"
-          value={password}
-          onChange={(e) => {
-            const val = e.target.value;
-            setPassword(val);
-            if (errors.password && val.length >= 6) setErrors((prev) => ({ ...prev, password: null }));
-            if (errors.confirm && val === confirm) setErrors((prev) => ({ ...prev, confirm: null }));
-            if (alert) setAlert(null);
-          }}
-          error={errors.password}
-          required
-          autoComplete="new-password"
-        />
-        <FormField
-          id="signup-confirm"
-          label="Confirm Password"
-          type="password"
-          placeholder="Re-enter your password"
-          value={confirm}
-          onChange={(e) => {
-            const val = e.target.value;
-            setConfirm(val);
-            if (errors.confirm && val === password) setErrors((prev) => ({ ...prev, confirm: null }));
-            if (alert) setAlert(null);
-          }}
-          error={errors.confirm}
-          required
-          autoComplete="new-password"
-        />
+      {step === 1 ? (
+        <>
+          <p className={authClasses.roleLabel}>I am a</p>
+          <RoleToggle value={role} onChange={setRole} options={ROLE_OPTIONS} />
 
-        <button className={authClasses.submitBtn} type="submit" disabled={loading}>
-          {loading ? <span className={authClasses.spinner} /> : 'Create Account'}
-        </button>
-      </form>
+          <form onSubmit={handleSignupSubmit} noValidate>
+            <FormField
+              id="signup-name"
+              label="Full Name"
+              type="text"
+              placeholder="John Doe"
+              value={name}
+              onChange={(e) => {
+                const val = e.target.value;
+                setName(val);
+                if (errors.name && val) setErrors((prev) => ({ ...prev, name: null }));
+                if (alert) setAlert(null);
+              }}
+              error={errors.name}
+              required
+              autoComplete="name"
+            />
+            <FormField
+              id="signup-email"
+              label="Email"
+              type="email"
+              placeholder="you@example.com"
+              value={email}
+              onChange={(e) => {
+                const val = e.target.value;
+                setEmail(val);
+                if (errors.email && val) setErrors((prev) => ({ ...prev, email: null }));
+                if (alert) setAlert(null);
+              }}
+              error={errors.email}
+              required
+              autoComplete="email"
+            />
+            <FormField
+              id="signup-password"
+              label="Password"
+              type="password"
+              placeholder="Min. 6 characters"
+              value={password}
+              onChange={(e) => {
+                const val = e.target.value;
+                setPassword(val);
+                if (errors.password && val.length >= 6) setErrors((prev) => ({ ...prev, password: null }));
+                if (errors.confirm && val === confirm) setErrors((prev) => ({ ...prev, confirm: null }));
+                if (alert) setAlert(null);
+              }}
+              error={errors.password}
+              required
+              autoComplete="new-password"
+            />
+            <FormField
+              id="signup-confirm"
+              label="Confirm Password"
+              type="password"
+              placeholder="Re-enter your password"
+              value={confirm}
+              onChange={(e) => {
+                const val = e.target.value;
+                setConfirm(val);
+                if (errors.confirm && val === password) setErrors((prev) => ({ ...prev, confirm: null }));
+                if (alert) setAlert(null);
+              }}
+              error={errors.confirm}
+              required
+              autoComplete="new-password"
+            />
 
-      <p className={authClasses.footer}>
-        Already have an account?{' '}
-        <Link to="/login" className={authClasses.link}>Sign in</Link>
-      </p>
+            <button className={authClasses.submitBtn} type="submit" disabled={loading}>
+              {loading ? <span className={authClasses.spinner} /> : 'Create Account'}
+            </button>
+          </form>
+
+          <p className={authClasses.footer}>
+            Already have an account?{' '}
+            <Link to="/login" className={authClasses.link}>Sign in</Link>
+          </p>
+        </>
+      ) : (
+        <form onSubmit={handleOtpSubmit} noValidate>
+          <FormField
+            id="signup-otp"
+            label="6-Digit Code"
+            type="text"
+            placeholder="123456"
+            value={otp}
+            onChange={(e) => {
+              const val = e.target.value.replace(/\D/g, '').slice(0, 6);
+              setOtp(val);
+              if (errors.otp && val.length === 6) setErrors((prev) => ({ ...prev, otp: null }));
+              if (alert) setAlert(null);
+            }}
+            error={errors.otp}
+            required
+            autoComplete="one-time-code"
+          />
+
+          <button className={authClasses.submitBtn} type="submit" disabled={loading}>
+            {loading ? <span className={authClasses.spinner} /> : 'Verify Code'}
+          </button>
+
+          <p className={authClasses.footer}>
+            Didn't receive the code?{' '}
+            <button 
+              type="button" 
+              onClick={handleResend}
+              disabled={loading}
+              className={`${authClasses.link} bg-transparent border-none p-0 cursor-pointer text-[0.86rem]`}
+            >
+              Resend it
+            </button>
+          </p>
+          <p className="text-center mt-2 text-[0.86rem] text-text-secondary">
+             <button 
+              type="button" 
+              onClick={() => { setStep(1); setAlert(null); }}
+              className={`${authClasses.link} bg-transparent border-none p-0 cursor-pointer text-[0.86rem]`}
+             >
+               Back to Signup
+             </button>
+          </p>
+        </form>
+      )}
     </AuthLayout>
   );
 }
