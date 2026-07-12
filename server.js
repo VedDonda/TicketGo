@@ -27,10 +27,6 @@ const start = async () => {
     const subClient = createRedisClient();
 
     if (pubClient && subClient) {
-      await Promise.all([
-        new Promise((res) => pubClient.once("ready", res)),
-        new Promise((res) => subClient.once("ready", res)),
-      ]);
       io.adapter(createAdapter(pubClient, subClient));
       console.log("[Socket.IO] Redis adapter attached");
     } else {
@@ -53,8 +49,8 @@ const start = async () => {
     socket.on("disconnect", () => {});
   });
   startSeatWorker(io);
-  const server = httpServer.listen(PORT, () => {
-    console.log(`TicketGo server running on http://localhost:${PORT}`);
+  const server = httpServer.listen(PORT, "0.0.0.0", () => {
+    console.log(`TicketGo server running on http://0.0.0.0:${PORT}`);
   });
 
   server.keepAliveTimeout = 65000;
