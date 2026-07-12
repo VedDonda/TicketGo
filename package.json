@@ -2,7 +2,7 @@
   "name": "ticketgo",
   "version": "1.0.0",
   "description": "",
-  "main": "index.js",
+  "main": "server.js",
   "scripts": {
     "start": "node server.js",
     "dev": "node --watch-path=./src --watch-path=./server.js --watch-path=./app.js server.js",

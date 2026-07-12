@@ -1,29 +1,8 @@
-const Event = require('../models/Event');
-const { generateSeatsForEvent } = require('../utils/seatGenerator');
-const { getSeatQueue } = require('../queues/seatQueue');
+const Event = require("../models/Event");
+const { generateSeatsForEvent } = require("../utils/seatGenerator");
+const { getSeatQueue } = require("../queues/seatQueue");
 
-// ─── POST /api/events ─────────────────────────────────────────────────────────
-
-/**
- * @desc   Create a new event (ORGANIZER / ADMIN only)
- * @route  POST /api/events
- * @access Private — ORGANIZER | ADMIN
- *
- * Flow (Redis available):
- *  1. Validate request body
- *  2. Save event as DRAFT in MongoDB
- *  3. Enqueue a BullMQ 'seat-generation' job — return 201 immediately
- *  4. Worker calls generateSeatsForEvent() and publishes the event asynchronously
- *  5. Worker emits Socket.IO `event:published` when done
- *
- * Flow (Redis unavailable — graceful fallback):
- *  1–2. Same as above
- *  3. generateSeatsForEvent() runs synchronously on this request thread
- *  4. Return 201 with the published event
- *
- * Why async?  For large events (e.g. 50,000 seats), the sync path can exceed
- * HTTP timeout limits and blocks the Node event loop. BullMQ offloads the work.
- */
+// Create a new event and initiate seat generation
 const createEvent = async (req, res) => {
   try {
     const {
@@ -38,24 +17,33 @@ const createEvent = async (req, res) => {
       imageUrl,
     } = req.body;
 
-    // ── Type-specific config validation ─────────────────────────────────────
-    if (eventType === 'RESERVED_SEATING') {
-      if (!seatingConfig || !Array.isArray(seatingConfig) || seatingConfig.length === 0) {
+    // Check seating configuration based on event type
+    if (eventType === "RESERVED_SEATING") {
+      if (
+        !seatingConfig ||
+        !Array.isArray(seatingConfig) ||
+        seatingConfig.length === 0
+      ) {
         return res.status(400).json({
           success: false,
-          message: 'seatingConfig array is required for RESERVED_SEATING events',
+          message:
+            "seatingConfig array is required for RESERVED_SEATING events",
         });
       }
-    } else if (eventType === 'ZONED_CAPACITY') {
-      if (!zoningConfig || !Array.isArray(zoningConfig) || zoningConfig.length === 0) {
+    } else if (eventType === "ZONED_CAPACITY") {
+      if (
+        !zoningConfig ||
+        !Array.isArray(zoningConfig) ||
+        zoningConfig.length === 0
+      ) {
         return res.status(400).json({
           success: false,
-          message: 'zoningConfig array is required for ZONED_CAPACITY events',
+          message: "zoningConfig array is required for ZONED_CAPACITY events",
         });
       }
     }
 
-    // ── Save event as DRAFT ──────────────────────────────────────────────────
+    // Persist event in the database
     const event = await Event.create({
       organizer: req.user._id,
       title,
@@ -64,20 +52,25 @@ const createEvent = async (req, res) => {
       venue,
       date,
       eventType,
-      seatingConfig: eventType === 'RESERVED_SEATING' ? seatingConfig : undefined,
-      zoningConfig:  eventType === 'ZONED_CAPACITY'   ? zoningConfig  : undefined,
+      seatingConfig:
+        eventType === "RESERVED_SEATING" ? seatingConfig : undefined,
+      zoningConfig: eventType === "ZONED_CAPACITY" ? zoningConfig : undefined,
       imageUrl,
-      hasImage: !!imageUrl && imageUrl.startsWith('data:image'),
-      status: 'DRAFT',
+      hasImage: !!imageUrl && imageUrl.startsWith("data:image"),
+      status: "DRAFT",
     });
-
-    const targetStatus = req.body.status === 'DRAFT' ? 'DRAFT' : 'PUBLISHED';
-
-    // ── Attempt async path via BullMQ ────────────────────────────────────────
+    const targetStatus = req.body.status === "DRAFT" ? "DRAFT" : "PUBLISHED";
     const queue = getSeatQueue();
+
+    // Enqueue seat generation job in background if queue is available
     if (queue) {
-      await queue.add('generate', { eventId: event._id.toString(), targetStatus });
-      console.log(`[EventController] Event ${event._id} enqueued for async seat generation → ${targetStatus}`);
+      await queue.add("generate", {
+        eventId: event._id.toString(),
+        targetStatus,
+      });
+      console.log(
+        `[EventController] Event ${event._id} enqueued for async seat generation → ${targetStatus}`,
+      );
 
       return res.status(201).json({
         success: true,
@@ -87,52 +80,53 @@ const createEvent = async (req, res) => {
       });
     }
 
-    // ── Sync fallback (Redis unavailable) ────────────────────────────────────
-    const { insertedCount } = await generateSeatsForEvent(event._id, targetStatus);
-    console.log(`[EventController] Event ${event._id} generated seats synchronously — Status: ${targetStatus}`);
+    const { insertedCount } = await generateSeatsForEvent(
+      event._id,
+      targetStatus,
+    );
 
-    const updatedEvent = await Event.findById(event._id).populate('organizer', 'name').lean();
+    console.log(
+      `[EventController] Event ${event._id} generated seats synchronously — Status: ${targetStatus}`,
+    );
+    const updatedEvent = await Event.findById(event._id)
+      .populate("organizer", "name")
+      .lean();
 
     return res.status(201).json({
       success: true,
       message: `Event "${title}" saved as ${targetStatus}! ${insertedCount} ${
-        eventType === 'RESERVED_SEATING' ? 'seat(s)' : 'zone(s)'
+        eventType === "RESERVED_SEATING" ? "seat(s)" : "zone(s)"
       } created.`,
       data: { event: updatedEvent },
     });
   } catch (error) {
-    if (error.name === 'ValidationError') {
+    if (error.name === "ValidationError") {
       const messages = Object.values(error.errors).map((e) => e.message);
-      return res.status(400).json({ success: false, message: messages.join('. ') });
+
+      return res
+        .status(400)
+        .json({ success: false, message: messages.join(". ") });
     }
-    console.error('[EventController] createEvent error:', error);
-    return res.status(500).json({ success: false, message: 'An unexpected error occurred while creating the event. Please try again later.' });
+
+    console.error("[EventController] createEvent error:", error);
+
+    return res
+      .status(500)
+      .json({
+        success: false,
+        message:
+          "An unexpected error occurred while creating the event. Please try again later.",
+      });
   }
 };
 
-// ─── GET /api/events ──────────────────────────────────────────────────────────
-
-/**
- * @desc   Get all published upcoming events (public)
- * @route  GET /api/events
- * @access Public
- *
- * Query params:
- *   page     — page number (default: 1)
- *   limit    — items per page (default: 10, max: 50)
- *   category — filter by category (e.g. MUSIC, SPORTS)
- *   city     — filter by venue city (case-insensitive)
- *   search   — text search on title
- */
 const getEvents = async (req, res) => {
   try {
     const page = Math.max(1, parseInt(req.query.page) || 1);
     const limit = Math.min(50, Math.max(1, parseInt(req.query.limit) || 10));
     const skip = (page - 1) * limit;
-
-    // ── Build filter ─────────────────────────────────────────────────────────
     const filter = {
-      status: 'PUBLISHED',
+      status: "PUBLISHED",
       date: { $gte: new Date() },
     };
 
@@ -141,22 +135,21 @@ const getEvents = async (req, res) => {
     }
 
     if (req.query.city) {
-      filter['venue.city'] = { $regex: req.query.city, $options: 'i' };
+      filter["venue.city"] = { $regex: req.query.city, $options: "i" };
     }
 
     if (req.query.search) {
-      filter.title = { $regex: req.query.search, $options: 'i' };
+      filter.title = { $regex: req.query.search, $options: "i" };
     }
 
-    // ── Query with pagination ────────────────────────────────────────────────
     const [events, totalCount] = await Promise.all([
       Event.find(filter)
-        .populate('organizer', 'name')
-        .select('-imageUrl -seatingConfig -zoningConfig')
+        .populate("organizer", "name")
+        .select("-imageUrl -seatingConfig -zoningConfig")
         .sort({ date: 1 })
         .skip(skip)
         .limit(limit)
-        .lean(),                       // plain JS objects — faster for read-only responses
+        .lean(),
       Event.countDocuments(filter),
     ]);
 
@@ -175,284 +168,347 @@ const getEvents = async (req, res) => {
       },
     });
   } catch (error) {
-    console.error('[EventController] getEvents error:', error);
-    return res.status(500).json({ success: false, message: 'An unexpected error occurred while fetching events. Please try again later.' });
+    console.error("[EventController] getEvents error:", error);
+
+    return res
+      .status(500)
+      .json({
+        success: false,
+        message:
+          "An unexpected error occurred while fetching events. Please try again later.",
+      });
   }
 };
 
-// ─── GET /api/events/:id ──────────────────────────────────────────────────────
-
-/**
- * @desc   Get a single event by ID (public)
- * @route  GET /api/events/:id
- * @access Public
- */
 const getEventById = async (req, res) => {
   try {
     const event = await Event.findById(req.params.id)
-      .populate('organizer', 'name')
-      .select('-imageUrl')
+      .populate("organizer", "name")
+      .select("-imageUrl")
       .lean();
 
     if (!event) {
-      return res.status(404).json({ success: false, message: 'Event not found' });
+      return res
+        .status(404)
+        .json({ success: false, message: "Event not found" });
     }
 
-    // Don't expose DRAFT or CANCELLED events to anonymous users
-    if (event.status === 'DRAFT' || event.status === 'CANCELLED') {
+    if (event.status === "DRAFT" || event.status === "CANCELLED") {
       const isOwner =
         req.user && req.user._id.toString() === event.organizer._id.toString();
-      const isAdmin = req.user && req.user.role === 'ADMIN';
+      const isAdmin = req.user && req.user.role === "ADMIN";
+
       if (!isOwner && !isAdmin) {
-        return res.status(404).json({ success: false, message: 'Event not found' });
+        return res
+          .status(404)
+          .json({ success: false, message: "Event not found" });
       }
     }
 
-    return res.status(200).json({ success: true, data: { event: mapImageRoute(event) } });
+    return res
+      .status(200)
+      .json({ success: true, data: { event: mapImageRoute(event) } });
   } catch (error) {
-    if (error.name === 'CastError') {
-      return res.status(404).json({ success: false, message: 'Event not found' });
+    if (error.name === "CastError") {
+      return res
+        .status(404)
+        .json({ success: false, message: "Event not found" });
     }
-    console.error('[EventController] getEventById error:', error);
-    return res.status(500).json({ success: false, message: 'An unexpected error occurred while fetching the event. Please try again later.' });
+
+    console.error("[EventController] getEventById error:", error);
+
+    return res
+      .status(500)
+      .json({
+        success: false,
+        message:
+          "An unexpected error occurred while fetching the event. Please try again later.",
+      });
   }
 };
 
-// ─── DELETE /api/events/:id ───────────────────────────────────────────────────
-
-/**
- * @desc   Delete an event (ADMIN only)
- * @route  DELETE /api/events/:id
- * @access Private — ADMIN
- */
 const deleteEvent = async (req, res) => {
   try {
     const event = await Event.findById(req.params.id);
+
     if (!event) {
-      return res.status(404).json({ success: false, message: 'Event not found' });
+      return res
+        .status(404)
+        .json({ success: false, message: "Event not found" });
     }
 
-    // Optional cleanup: delete associated inventory and tickets
     try {
-      const Ticket = require('../models/Ticket');
-      const Inventory = require('../models/Inventory');
+      const Ticket = require("../models/Ticket");
+      const Inventory = require("../models/Inventory");
+
       await Promise.all([
         Ticket.deleteMany({ event: event._id }),
-        Inventory.deleteMany({ event: event._id })
+        Inventory.deleteMany({ event: event._id }),
       ]);
     } catch (e) {}
 
     await Event.findByIdAndDelete(req.params.id);
-    return res.status(200).json({ success: true, message: 'Event deleted successfully' });
+
+    return res
+      .status(200)
+      .json({ success: true, message: "Event deleted successfully" });
   } catch (error) {
-    console.error('[EventController] deleteEvent error:', error);
-    return res.status(500).json({ success: false, message: 'An unexpected error occurred... Please try again later.' });
+    console.error("[EventController] deleteEvent error:", error);
+
+    return res
+      .status(500)
+      .json({
+        success: false,
+        message: "An unexpected error occurred... Please try again later.",
+      });
   }
 };
 
-// ─── HELPER: Map Base64 Images ─────────────────────────────────────────────
-// Prevents sending massive 5MB+ base64 strings in JSON responses.
-// Since we exclude imageUrl from the query, we use hasImage to generate the path.
 const mapImageRoute = (event) => {
   if (event && event.hasImage) {
     event.imageUrl = `/api/events/${event._id}/image`;
-  } else if (event && event.imageUrl && event.imageUrl.startsWith('http')) {
-    // Keep external URL if somehow provided
-  } else if (event && event.imageUrl && event.imageUrl.startsWith('data:image')) {
-    // If we fetched the full document (e.g. getEventById), strip it
+  } else if (event && event.imageUrl && event.imageUrl.startsWith("http")) {
+  } else if (
+    event &&
+    event.imageUrl &&
+    event.imageUrl.startsWith("data:image")
+  ) {
     event.imageUrl = `/api/events/${event._id}/image`;
   }
+
   return event;
 };
 
-// ─── GET /api/events/:id/image ────────────────────────────────────────────────
-/**
- * @desc   Serve the base64 image directly as a binary HTTP response
- * @route  GET /api/events/:id/image
- * @access Public
- */
 const getEventImage = async (req, res) => {
   try {
-    const event = await Event.findById(req.params.id).select('imageUrl').lean();
-    if (!event || !event.imageUrl || !event.imageUrl.startsWith('data:image')) {
-      return res.status(404).send('Not found');
+    const event = await Event.findById(req.params.id).select("imageUrl").lean();
+
+    if (!event || !event.imageUrl || !event.imageUrl.startsWith("data:image")) {
+      return res.status(404).send("Not found");
     }
 
     const matches = event.imageUrl.match(/^data:([A-Za-z-+\/]+);base64,(.+)$/);
+
     if (!matches || matches.length !== 3) {
-      return res.status(400).send('Invalid image format');
+      return res.status(400).send("Invalid image format");
     }
 
     const mimeType = matches[1];
-    const imageBuffer = Buffer.from(matches[2], 'base64');
+    const imageBuffer = Buffer.from(matches[2], "base64");
 
     res.writeHead(200, {
-      'Content-Type': mimeType,
-      'Content-Length': imageBuffer.length,
-      'Cache-Control': 'public, max-age=86400' // Cache for 1 day
+      "Content-Type": mimeType,
+      "Content-Length": imageBuffer.length,
+      "Cache-Control": "public, max-age=86400",
     });
     res.end(imageBuffer);
   } catch (error) {
-    console.error('[EventController] getEventImage error:', error);
-    res.status(500).send('Server error');
+    console.error("[EventController] getEventImage error:", error);
+    res.status(500).send("Server error");
   }
 };
 
-// ─── PUT /api/events/:id/image ────────────────────────────────────────────────
-
-/**
- * @desc   Update event image (ORGANIZER / ADMIN only)
- * @route  PUT /api/events/:id/image
- * @access Private — ORGANIZER | ADMIN
- */
 const updateEventImage = async (req, res) => {
   try {
     const event = await Event.findById(req.params.id);
+
     if (!event) {
-      return res.status(404).json({ success: false, message: 'Event not found' });
+      return res
+        .status(404)
+        .json({ success: false, message: "Event not found" });
     }
-    
-    // Check ownership
+
     const isOwner = req.user._id.toString() === event.organizer.toString();
-    const isAdmin = req.user.role === 'ADMIN';
+    const isAdmin = req.user.role === "ADMIN";
+
     if (!isOwner && !isAdmin) {
-      return res.status(403).json({ success: false, message: 'Not authorized to update this event' });
+      return res
+        .status(403)
+        .json({
+          success: false,
+          message: "Not authorized to update this event",
+        });
     }
 
     if (!req.body.imageUrl) {
-      return res.status(400).json({ success: false, message: 'imageUrl is required' });
+      return res
+        .status(400)
+        .json({ success: false, message: "imageUrl is required" });
     }
 
     event.imageUrl = req.body.imageUrl;
-    event.hasImage = !!req.body.imageUrl && req.body.imageUrl.startsWith('data:image');
+    event.hasImage =
+      !!req.body.imageUrl && req.body.imageUrl.startsWith("data:image");
     await event.save();
 
-    return res.status(200).json({ success: true, message: 'Event image updated successfully', data: { event } });
+    return res
+      .status(200)
+      .json({
+        success: true,
+        message: "Event image updated successfully",
+        data: { event },
+      });
   } catch (error) {
-    console.error('[EventController] updateEventImage error:', error);
-    return res.status(500).json({ success: false, message: 'An unexpected error occurred... Please try again later.' });
+    console.error("[EventController] updateEventImage error:", error);
+
+    return res
+      .status(500)
+      .json({
+        success: false,
+        message: "An unexpected error occurred... Please try again later.",
+      });
   }
 };
 
-// ─── GET /api/events/organizer/me ────────────────────────────────────────────────
-
-/**
- * @desc   Get events created by the logged-in organizer
- * @route  GET /api/events/organizer/me
- * @access Private — ORGANIZER | ADMIN
- */
 const getMyEvents = async (req, res) => {
   try {
     const events = await Event.find({ organizer: req.user._id })
-      .select('-imageUrl -seatingConfig -zoningConfig')
+      .select("-imageUrl -seatingConfig -zoningConfig")
       .sort({ createdAt: -1 })
       .lean();
-    return res.status(200).json({ success: true, data: { events: events.map(mapImageRoute) } });
+
+    return res
+      .status(200)
+      .json({ success: true, data: { events: events.map(mapImageRoute) } });
   } catch (error) {
-    console.error('[EventController] getMyEvents error:', error);
-    return res.status(500).json({ success: false, message: 'Server error' });
+    console.error("[EventController] getMyEvents error:", error);
+
+    return res.status(500).json({ success: false, message: "Server error" });
   }
 };
 
-// ─── PUT /api/events/:id/publish ─────────────────────────────────────────────
-
-/**
- * @desc   Publish a draft event
- * @route  PUT /api/events/:id/publish
- * @access Private — ORGANIZER (owner) | ADMIN
- */
 const publishEvent = async (req, res) => {
   try {
     const event = await Event.findById(req.params.id);
-    if (!event) return res.status(404).json({ success: false, message: 'Event not found' });
 
-    // Auth check
-    if (event.organizer.toString() !== req.user._id.toString() && req.user.role !== 'ADMIN') {
-      return res.status(403).json({ success: false, message: 'Not authorized to publish this event' });
+    if (!event)
+      return res
+        .status(404)
+        .json({ success: false, message: "Event not found" });
+
+    if (
+      event.organizer.toString() !== req.user._id.toString() &&
+      req.user.role !== "ADMIN"
+    ) {
+      return res
+        .status(403)
+        .json({
+          success: false,
+          message: "Not authorized to publish this event",
+        });
     }
 
-    if (event.status !== 'DRAFT') {
-      return res.status(400).json({ success: false, message: `Event is already ${event.status}` });
+    if (event.status !== "DRAFT") {
+      return res
+        .status(400)
+        .json({ success: false, message: `Event is already ${event.status}` });
     }
 
-    // ── Attempt async path via BullMQ ────────────────────────────────────────
     const queue = getSeatQueue();
+
     if (queue) {
-      await queue.add('generate', { eventId: event._id.toString(), targetStatus: 'PUBLISHED' });
-      console.log(`[EventController] Event ${event._id} enqueued for async publish`);
+      await queue.add("generate", {
+        eventId: event._id.toString(),
+        targetStatus: "PUBLISHED",
+      });
+      console.log(
+        `[EventController] Event ${event._id} enqueued for async publish`,
+      );
+
       return res.status(200).json({
         success: true,
-        message: 'Event is being published. Seats are generating in the background.',
+        message:
+          "Event is being published. Seats are generating in the background.",
         async: true,
       });
     }
 
-    // ── Sync fallback ────────────────────────────────────────────────────────
-    const { insertedCount } = await generateSeatsForEvent(event._id, 'PUBLISHED');
-    return res.status(200).json({ success: true, message: `Event published! ${insertedCount} records inserted.` });
+    const { insertedCount } = await generateSeatsForEvent(
+      event._id,
+      "PUBLISHED",
+    );
+
+    return res
+      .status(200)
+      .json({
+        success: true,
+        message: `Event published! ${insertedCount} records inserted.`,
+      });
   } catch (error) {
-    console.error('[EventController] publishEvent error:', error);
-    return res.status(500).json({ success: false, message: 'Server error' });
+    console.error("[EventController] publishEvent error:", error);
+
+    return res.status(500).json({ success: false, message: "Server error" });
   }
 };
 
-// ─── GET /api/events/:id/dashboard-metrics ───────────────────────────────────
-
-/**
- * @desc   Get basic ticket sales metrics for the Organizer Dashboard
- * @route  GET /api/events/:id/dashboard-metrics
- * @access Private — ORGANIZER (owner) | ADMIN
- */
 const getDashboardMetrics = async (req, res) => {
   try {
     const event = await Event.findById(req.params.id).lean();
-    if (!event) return res.status(404).json({ success: false, message: 'Event not found' });
-    
-    if (event.organizer.toString() !== req.user._id.toString() && req.user.role !== 'ADMIN') {
-      return res.status(403).json({ success: false, message: 'Not authorized' });
+
+    if (!event)
+      return res
+        .status(404)
+        .json({ success: false, message: "Event not found" });
+
+    if (
+      event.organizer.toString() !== req.user._id.toString() &&
+      req.user.role !== "ADMIN"
+    ) {
+      return res
+        .status(403)
+        .json({ success: false, message: "Not authorized" });
     }
 
     let ticketsSold = 0;
     let totalCapacity = 0;
     let totalRevenue = 0;
 
-    if (event.eventType === 'RESERVED_SEATING') {
-      const Ticket = require('../models/Ticket');
+    if (event.eventType === "RESERVED_SEATING") {
+      const Ticket = require("../models/Ticket");
       const stats = await Ticket.aggregate([
         { $match: { event: event._id } },
-        { 
+        {
           $group: {
             _id: null,
             totalCapacity: { $sum: 1 },
-            ticketsSold: { $sum: { $cond: [{ $eq: ["$status", "BOOKED"] }, 1, 0] } },
-            totalRevenue: { $sum: { $cond: [{ $eq: ["$status", "BOOKED"] }, "$price", 0] } }
-          }
-        }
+            ticketsSold: {
+              $sum: { $cond: [{ $eq: ["$status", "BOOKED"] }, 1, 0] },
+            },
+            totalRevenue: {
+              $sum: { $cond: [{ $eq: ["$status", "BOOKED"] }, "$price", 0] },
+            },
+          },
+        },
       ]);
-      
+
       if (stats.length > 0) {
         totalCapacity = stats[0].totalCapacity;
         ticketsSold = stats[0].ticketsSold;
         totalRevenue = stats[0].totalRevenue;
       }
-    } else if (event.eventType === 'ZONED_CAPACITY') {
-      const Inventory = require('../models/Inventory');
+    } else if (event.eventType === "ZONED_CAPACITY") {
+      const Inventory = require("../models/Inventory");
       const stats = await Inventory.aggregate([
         { $match: { event: event._id } },
         {
           $group: {
             _id: null,
             totalCapacity: { $sum: "$totalSeats" },
-            ticketsSold: { $sum: { $subtract: ["$totalSeats", "$availableSeats"] } },
-            totalRevenue: { 
-              $sum: { 
-                $multiply: [ { $subtract: ["$totalSeats", "$availableSeats"] }, "$price" ] 
-              } 
-            }
-          }
-        }
+            ticketsSold: {
+              $sum: { $subtract: ["$totalSeats", "$availableSeats"] },
+            },
+            totalRevenue: {
+              $sum: {
+                $multiply: [
+                  { $subtract: ["$totalSeats", "$availableSeats"] },
+                  "$price",
+                ],
+              },
+            },
+          },
+        },
       ]);
-      
+
       if (stats.length > 0) {
         totalCapacity = stats[0].totalCapacity;
         ticketsSold = stats[0].ticketsSold;
@@ -467,12 +523,23 @@ const getDashboardMetrics = async (req, res) => {
         ticketsRemaining: totalCapacity - ticketsSold,
         totalCapacity,
         totalRevenue,
-      }
+      },
     });
   } catch (error) {
-    console.error('[EventController] getDashboardMetrics error:', error);
-    return res.status(500).json({ success: false, message: 'Server error' });
+    console.error("[EventController] getDashboardMetrics error:", error);
+
+    return res.status(500).json({ success: false, message: "Server error" });
   }
 };
 
-module.exports = { createEvent, getEvents, getEventById, deleteEvent, getEventImage, updateEventImage, getMyEvents, publishEvent, getDashboardMetrics };
+module.exports = {
+  createEvent,
+  getEvents,
+  getEventById,
+  deleteEvent,
+  getEventImage,
+  updateEventImage,
+  getMyEvents,
+  publishEvent,
+  getDashboardMetrics,
+};

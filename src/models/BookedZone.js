@@ -1,15 +1,15 @@
-const mongoose = require('mongoose');
+const mongoose = require("mongoose");
 
 const bookedZoneSchema = new mongoose.Schema(
   {
     event: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: 'Event',
+      ref: "Event",
       required: true,
     },
     bookedBy: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: 'User',
+      ref: "User",
       required: true,
     },
     zoneName: {
@@ -20,17 +20,17 @@ const bookedZoneSchema = new mongoose.Schema(
     quantity: {
       type: Number,
       required: true,
-      min: [1, 'Quantity must be at least 1'],
+      min: [1, "Quantity must be at least 1"],
     },
     price: {
       type: Number,
       required: true,
     },
   },
-  { timestamps: true }
+  { timestamps: true },
 );
 
 bookedZoneSchema.index({ event: 1, bookedBy: 1 });
 bookedZoneSchema.index({ bookedBy: 1, event: 1 });
 
-module.exports = mongoose.model('BookedZone', bookedZoneSchema);
+module.exports = mongoose.model("BookedZone", bookedZoneSchema);

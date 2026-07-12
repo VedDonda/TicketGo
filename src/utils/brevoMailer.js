@@ -1,54 +1,33 @@
-/**
- * brevoMailer.js — Thin wrapper around the Brevo Transactional Email REST API.
- *
- * Why no SDK/nodemailer?
- *   - Zero additional dependencies — uses Node's built-in `https` module.
- *   - Brevo's REST API is simple enough that a raw HTTPS request is cleaner.
- *
- * Required env vars:
- *   BREVO_API_KEY       — Your Brevo API key (v3)
- *   BREVO_SENDER_EMAIL  — Verified sender email address in your Brevo account
- *   BREVO_SENDER_NAME   — Display name (optional, defaults to "TicketGo")
- */
+// Email service using Brevo API
+const https = require("https");
 
-const https = require('https');
-
-/**
- * Send an OTP verification email via the Brevo Transactional Email API.
- *
- * @param {string} toEmail   — Recipient email address
- * @param {string} toName    — Recipient display name
- * @param {string} otp       — The 6-digit OTP code
- * @returns {Promise<object>} — Brevo API response body (parsed JSON)
- */
 const sendOtpEmail = (toEmail, toName, otp) => {
   return new Promise((resolve, reject) => {
     const payload = JSON.stringify({
       sender: {
-        name:  process.env.BREVO_SENDER_NAME  || 'TicketGo',
+        name: process.env.BREVO_SENDER_NAME || "TicketGo",
         email: process.env.BREVO_SENDER_EMAIL,
       },
       to: [{ email: toEmail, name: toName }],
-      subject: 'Your TicketGo Verification Code',
+      subject: "Your TicketGo Verification Code",
       htmlContent: buildOtpHtml(toName, otp),
     });
-
     const options = {
-      hostname: 'api.brevo.com',
-      path:     '/v3/smtp/email',
-      method:   'POST',
+      hostname: "api.brevo.com",
+      path: "/v3/smtp/email",
+      method: "POST",
       headers: {
-        'accept':         'application/json',
-        'api-key':        process.env.BREVO_API_KEY,
-        'content-type':   'application/json',
-        'content-length': Buffer.byteLength(payload),
+        accept: "application/json",
+        "api-key": process.env.BREVO_API_KEY,
+        "content-type": "application/json",
+        "content-length": Buffer.byteLength(payload),
       },
     };
-
     const req = https.request(options, (res) => {
-      let body = '';
-      res.on('data', (chunk) => (body += chunk));
-      res.on('end', () => {
+      let body = "";
+
+      res.on("data", (chunk) => (body += chunk));
+      res.on("end", () => {
         if (res.statusCode >= 200 && res.statusCode < 300) {
           try {
             resolve(JSON.parse(body));
@@ -56,25 +35,19 @@ const sendOtpEmail = (toEmail, toName, otp) => {
             resolve({ raw: body });
           }
         } else {
-          reject(
-            new Error(`[Brevo] API error ${res.statusCode}: ${body}`)
-          );
+          reject(new Error(`[Brevo] API error ${res.statusCode}: ${body}`));
         }
       });
     });
 
-    req.on('error', (err) => reject(new Error(`[Brevo] Request failed: ${err.message}`)));
+    req.on("error", (err) =>
+      reject(new Error(`[Brevo] Request failed: ${err.message}`)),
+    );
     req.write(payload);
     req.end();
   });
 };
 
-// ── Email template ────────────────────────────────────────────────────────────
-
-/**
- * Build the HTML body for the OTP email.
- * Simple inline-styled template — no external CSS dependencies.
- */
 const buildOtpHtml = (name, otp) => `
 <!DOCTYPE html>
 <html lang="en">
