@@ -1,17 +1,7 @@
 // Navigation bar component
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import { getCurrentUser, clearSession } from "../services/authService";
-const TicketIcon = () => (
-  <svg
-    viewBox="0 0 24 24"
-    fill="white"
-    xmlns="http://www.w3.org/2000/svg"
-    width="20"
-    height="20"
-  >
-    <path d="M22 9V7a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v2a2 2 0 0 1 0 4v2a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-2a2 2 0 0 1 0-4z" />
-  </svg>
-);
+
 
 export default function Navbar() {
   const navigate = useNavigate();
@@ -48,19 +38,7 @@ export default function Navbar() {
           textDecoration: "none",
         }}
       >
-        <div
-          style={{
-            width: 36,
-            height: 36,
-            background: "linear-gradient(135deg,#5b5fc7,#8084e8)",
-            borderRadius: "10px",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-          }}
-        >
-          <TicketIcon />
-        </div>
+        <img src="/logo.png" alt="TicketGo" style={{ width: 36, height: 36, objectFit: 'contain' }} />
         <span
           style={{
             fontSize: "1.15rem",

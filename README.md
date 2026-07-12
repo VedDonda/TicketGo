@@ -1,6 +1,6 @@
 # TicketGo
 
-![TicketGo Banner](https://via.placeholder.com/1200x300.png?text=TicketGo+-+High-Performance+Ticketing+Platform)
+**Live Website:** [https://ticketgo-live.vercel.app/](https://ticketgo-live.vercel.app/)
 
 > **A fast and reliable ticket booking platform built to handle sudden traffic spikes without crashing or double-booking seats.**
 

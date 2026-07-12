@@ -1,4 +1,5 @@
-const API = `${import.meta.env.VITE_API_URL || ""}/api/events`;
+const BASE_URL = import.meta.env.VITE_API_URL || "https://ticketgo-hu5q.onrender.com";
+const API = `${BASE_URL}/api/events`;
 
 export const fetchEvents = async (params = {}) => {
   const query = new URLSearchParams();
@@ -11,6 +12,13 @@ export const fetchEvents = async (params = {}) => {
   const res = await fetch(`${API}?${query.toString()}`);
 
   return res.json().then((data) => ({ ok: res.ok, data }));
+};
+
+export const getImageUrl = (url) => {
+  if (!url) return "";
+  if (url.startsWith("http") || url.startsWith("data:")) return url;
+  const baseUrl = BASE_URL.replace(/\/api.*$/, "");
+  return `${baseUrl}${url}`;
 };
 
 export const fetchEventById = async (id) => {
@@ -52,7 +60,7 @@ export const uploadImageRequest = async (file) => {
   const formData = new FormData();
 
   formData.append("image", file);
-  const res = await fetch("/api/upload", {
+  const res = await fetch(`${BASE_URL}/api/upload`, {
     method: "POST",
     headers: { Authorization: `Bearer ${token}` },
     body: formData,

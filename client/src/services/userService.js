@@ -1,5 +1,6 @@
-const API = `${import.meta.env.VITE_API_URL || ""}/api/users`;
-const AUTH_API = `${import.meta.env.VITE_API_URL || ""}/api/auth`;
+const BASE_URL = import.meta.env.VITE_API_URL || "https://ticketgo-hu5q.onrender.com";
+const API = `${BASE_URL}/api/users`;
+const AUTH_API = `${BASE_URL}/api/auth`;
 const authHeaders = () => ({
   "Content-Type": "application/json",
   Authorization: `Bearer ${localStorage.getItem("tg_token")}`,
@@ -38,7 +39,7 @@ export const fetchMyBookings = async () => {
 };
 
 export const fetchMyEventTickets = async (eventId) => {
-  const res = await fetch(`/api/events/${eventId}/my-tickets`, {
+  const res = await fetch(`${BASE_URL}/api/events/${eventId}/my-tickets`, {
     headers: authHeaders(),
   });
 

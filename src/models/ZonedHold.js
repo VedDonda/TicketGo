@@ -31,5 +31,6 @@ const zonedHoldSchema = new mongoose.Schema(
 );
 
 zonedHoldSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 0 });
+zonedHoldSchema.index({ event: 1, expiresAt: 1 });
 zonedHoldSchema.index({ event: 1, user: 1 });
 module.exports = mongoose.model("ZonedHold", zonedHoldSchema);

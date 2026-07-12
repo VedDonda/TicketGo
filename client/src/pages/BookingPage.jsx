@@ -150,7 +150,7 @@ export default function BookingPage() {
   useEffect(() => {
     if (!event) return;
     const backendUrl =
-      import.meta.env.VITE_SOCKET_URL || window.location.origin;
+      import.meta.env.VITE_SOCKET_URL || "https://ticketgo-hu5q.onrender.com";
     const socket = io(backendUrl, {
       transports: ["websocket", "polling"],
       withCredentials: true,

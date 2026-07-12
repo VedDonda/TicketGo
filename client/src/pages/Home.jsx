@@ -2,18 +2,8 @@
 import { useState, useEffect, useCallback } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { getCurrentUser, clearSession } from "../services/authService";
-import { fetchEvents } from "../services/eventService";
-const TicketIcon = () => (
-  <svg
-    viewBox="0 0 24 24"
-    fill="white"
-    xmlns="http://www.w3.org/2000/svg"
-    width="20"
-    height="20"
-  >
-    <path d="M22 9V7a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v2a2 2 0 0 1 0 4v2a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-2a2 2 0 0 1 0-4z" />
-  </svg>
-);
+import { fetchEvents, getImageUrl } from "../services/eventService";
+
 const SearchIcon = () => (
   <svg
     width="16"
@@ -189,7 +179,7 @@ function EventCard({ event }) {
       >
         {event.imageUrl && (
           <img
-            src={event.imageUrl}
+            src={getImageUrl(event.imageUrl)}
             alt={event.title}
             style={{
               width: "100%",
@@ -821,19 +811,7 @@ export default function Home() {
             marginBottom: "12px",
           }}
         >
-          <div
-            style={{
-              width: 28,
-              height: 28,
-              background: "#5b5fc7",
-              borderRadius: "8px",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-            }}
-          >
-            <TicketIcon />
-          </div>
+          <img src="/logo.png" alt="TicketGo" style={{ width: 28, height: 28, objectFit: 'contain' }} />
           <span style={{ fontWeight: 800, color: "#f0f0f5" }}>TicketGo</span>
         </div>
         <p style={{ margin: 0, color: "#55556a", fontSize: "0.8rem" }}>

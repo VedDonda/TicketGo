@@ -1,4 +1,4 @@
-const API = `${import.meta.env.VITE_API_URL || ""}/api/events`;
+const API = `${import.meta.env.VITE_API_URL || "https://ticketgo-hu5q.onrender.com"}/api/events`;
 const authHeaders = () => ({
   "Content-Type": "application/json",
   Authorization: `Bearer ${localStorage.getItem("tg_token")}`,

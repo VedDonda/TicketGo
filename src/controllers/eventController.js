@@ -443,7 +443,7 @@ const publishEvent = async (req, res) => {
 
 const getDashboardMetrics = async (req, res) => {
   try {
-    const event = await Event.findById(req.params.id).lean();
+    const event = await Event.findById(req.params.id).select("eventType organizer").lean();
 
     if (!event)
       return res

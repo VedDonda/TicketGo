@@ -1,22 +1,18 @@
-// Redis configuration and connection
 const IORedis = require("ioredis");
-const REDIS_URL = process.env.REDIS_URL;
 
 const createRedisClient = (overrides = {}) => {
-  if (!REDIS_URL) {
+  if (!process.env.REDIS_URL) {
     console.warn("[Redis] REDIS_URL not set — Redis features disabled");
-
     return null;
   }
 
   try {
-    const isTLS = REDIS_URL.startsWith("rediss://");
-    const client = new IORedis(REDIS_URL, {
+    const isTLS = process.env.REDIS_URL.startsWith("rediss://");
+    const client = new IORedis(process.env.REDIS_URL, {
       enableReadyCheck: false,
       maxRetriesPerRequest: null,
       retryStrategy: (times) => {
         if (times > 5) return null;
-
         return Math.min(times * 200, 2000);
       },
       ...(isTLS ? { tls: {} } : {}),
@@ -30,7 +26,6 @@ const createRedisClient = (overrides = {}) => {
     return client;
   } catch (err) {
     console.error(`[Redis] Failed to initialize: ${err.message}`);
-
     return null;
   }
 };
@@ -50,4 +45,4 @@ const getRedisClient = () => {
   return _sharedClient;
 };
 
-module.exports = { getRedisClient, createRedisClient, REDIS_URL };
+module.exports = { getRedisClient, createRedisClient };

@@ -99,21 +99,29 @@ const releaseExpiredZoneHolds = async (eventId) => {
   const expired = await ZonedHold.find({
     event: eventId,
     expiresAt: { $lt: now },
-  });
+  }).lean();
 
-  for (const hold of expired) {
-    await Inventory.findOneAndUpdate(
-      { event: eventId, zoneName: hold.zoneName },
-      { $inc: { availableSeats: hold.quantity } },
-    );
-    await ZonedHold.findByIdAndDelete(hold._id);
+  if (expired.length === 0) return;
+
+  const bulkOps = expired.map((hold) => ({
+    updateOne: {
+      filter: { event: eventId, zoneName: hold.zoneName },
+      update: { $inc: { availableSeats: hold.quantity } },
+    },
+  }));
+
+  if (bulkOps.length > 0) {
+    await Inventory.bulkWrite(bulkOps);
   }
+
+  const expiredIds = expired.map((h) => h._id);
+  await ZonedHold.deleteMany({ _id: { $in: expiredIds } });
 };
 
 // Fetch all seats and group them by section and row
 const getSeats = async (req, res) => {
   try {
-    const event = await Event.findById(req.params.id).lean();
+    const event = await Event.findById(req.params.id).select("eventType status").lean();
 
     if (!event)
       return res
@@ -134,10 +142,12 @@ const getSeats = async (req, res) => {
     await releaseExpiredTickets(req.params.id, redis);
     const tickets = await Ticket.find({ event: req.params.id })
       .select("section row seatNumber status heldBy price")
+      .sort({ section: 1, row: 1, seatNumber: 1 })
       .lean();
     const grouped = {};
 
-    for (const t of tickets) {
+    for (let i = 0; i < tickets.length; i++) {
+      const t = tickets[i];
       if (!grouped[t.section]) grouped[t.section] = {};
       if (!grouped[t.section][t.row]) grouped[t.section][t.row] = [];
       grouped[t.section][t.row].push({
@@ -149,12 +159,6 @@ const getSeats = async (req, res) => {
         price: t.price,
         isMyHold: t.heldBy?.toString() === req.user?._id?.toString(),
       });
-    }
-
-    for (const section of Object.keys(grouped)) {
-      for (const row of Object.keys(grouped[section])) {
-        grouped[section][row].sort((a, b) => a.seatNumber - b.seatNumber);
-      }
     }
 
     return res.status(200).json({ success: true, data: { seats: grouped } });
@@ -173,7 +177,7 @@ const getSeats = async (req, res) => {
 
 const getZones = async (req, res) => {
   try {
-    const event = await Event.findById(req.params.id).lean();
+    const event = await Event.findById(req.params.id).select("eventType status").lean();
 
     if (!event)
       return res
@@ -215,7 +219,7 @@ const getZones = async (req, res) => {
 
 const holdSeats = async (req, res) => {
   try {
-    const event = await Event.findById(req.params.id).lean();
+    const event = await Event.findById(req.params.id).select("eventType status").lean();
 
     if (!event)
       return res
@@ -277,54 +281,59 @@ const holdSeats = async (req, res) => {
       const failedSeats = [];
       const redisLockedSeats = [];
 
-      for (const s of seats) {
-        // Attempt to atomically lock the seat in Redis
-        const lockAcquired = await acquireSeatLock(
-          redis,
-          req.params.id,
-          s.section,
-          s.row,
-          s.seatNumber,
-          req.user._id,
-          HOLD_SECONDS,
-        );
-
-        if (!lockAcquired) {
-          failedSeats.push(s);
-          continue;
-        }
-
-        redisLockedSeats.push(s);
-        const ticket = await Ticket.findOneAndUpdate(
-          {
-            event: req.params.id,
-            section: s.section,
-            row: s.row,
-            seatNumber: s.seatNumber,
-            status: "AVAILABLE",
-          },
-          {
-            $set: {
-              status: "HELD",
-              heldBy: req.user._id,
-              heldUntil: expiresAt,
-            },
-          },
-          { returnDocument: "after" },
-        );
-
-        if (ticket) {
-          heldTickets.push(ticket);
-        } else {
-          await releaseSeatLock(
+      const holdResults = await Promise.all(
+        seats.map(async (s) => {
+          const lockAcquired = await acquireSeatLock(
             redis,
             req.params.id,
             s.section,
             s.row,
             s.seatNumber,
+            req.user._id,
+            HOLD_SECONDS,
           );
-          redisLockedSeats.pop();
-          failedSeats.push(s);
+
+          if (!lockAcquired) return { success: false, seat: s };
+
+          const ticket = await Ticket.findOneAndUpdate(
+            {
+              event: req.params.id,
+              section: s.section,
+              row: s.row,
+              seatNumber: s.seatNumber,
+              status: "AVAILABLE",
+            },
+            {
+              $set: {
+                status: "HELD",
+                heldBy: req.user._id,
+                heldUntil: expiresAt,
+              },
+            },
+            { returnDocument: "after" },
+          );
+
+          if (ticket) {
+            return { success: true, ticket, lockedSeat: s };
+          } else {
+            await releaseSeatLock(
+              redis,
+              req.params.id,
+              s.section,
+              s.row,
+              s.seatNumber,
+            );
+            return { success: false, seat: s };
+          }
+        }),
+      );
+
+      for (const res of holdResults) {
+        if (res.success) {
+          heldTickets.push(res.ticket);
+          redisLockedSeats.push(res.lockedSeat);
+        } else {
+          failedSeats.push(res.seat);
         }
       }
 
@@ -515,7 +524,7 @@ const holdSeats = async (req, res) => {
 
 const releaseHold = async (req, res) => {
   try {
-    const event = await Event.findById(req.params.id).lean();
+    const event = await Event.findById(req.params.id).select("eventType status").lean();
 
     if (!event)
       return res
@@ -608,7 +617,7 @@ const releaseHold = async (req, res) => {
 
 const confirmPurchase = async (req, res) => {
   try {
-    const event = await Event.findById(req.params.id).lean();
+    const event = await Event.findById(req.params.id).select("eventType status").lean();
 
     if (!event)
       return res
@@ -706,33 +715,37 @@ const confirmPurchase = async (req, res) => {
       const confirmedZones = [];
       let totalPrice = 0;
 
-      for (const hold of holds) {
-        await ZonedHold.findByIdAndDelete(hold._id);
-        const inventory = await Inventory.findOne({
-          event: req.params.id,
-          zoneName: hold.zoneName,
-        }).lean();
-        const subtotal = inventory ? inventory.price * hold.quantity : 0;
+      await Promise.all(
+        holds.map(async (hold) => {
+          await ZonedHold.findByIdAndDelete(hold._id);
+          const inventory = await Inventory.findOne({
+            event: req.params.id,
+            zoneName: hold.zoneName,
+          }).lean();
+          const subtotal = inventory ? inventory.price * hold.quantity : 0;
 
-        totalPrice += subtotal;
-        await BookedZone.create({
-          event: req.params.id,
-          bookedBy: req.user._id,
-          zoneName: hold.zoneName,
-          quantity: hold.quantity,
-          price: inventory ? inventory.price : 0,
-        });
-        confirmedZones.push({
-          zoneName: hold.zoneName,
-          quantity: hold.quantity,
-          subtotal,
-        });
-        io?.to(room).emit("zone:update", {
-          eventId: req.params.id,
-          zoneName: hold.zoneName,
-          availableSeats: inventory?.availableSeats ?? 0,
-        });
-      }
+          await BookedZone.create({
+            event: req.params.id,
+            bookedBy: req.user._id,
+            zoneName: hold.zoneName,
+            quantity: hold.quantity,
+            price: inventory ? inventory.price : 0,
+          });
+
+          confirmedZones.push({
+            zoneName: hold.zoneName,
+            quantity: hold.quantity,
+            subtotal,
+          });
+          totalPrice += subtotal;
+
+          io?.to(room).emit("zone:update", {
+            eventId: req.params.id,
+            zoneName: hold.zoneName,
+            availableSeats: inventory?.availableSeats ?? 0,
+          });
+        })
+      );
 
       return res.status(200).json({
         success: true,
@@ -762,7 +775,7 @@ const confirmPurchase = async (req, res) => {
 
 const getMyTickets = async (req, res) => {
   try {
-    const event = await Event.findById(req.params.id).lean();
+    const event = await Event.findById(req.params.id).select("eventType status").lean();
 
     if (!event)
       return res

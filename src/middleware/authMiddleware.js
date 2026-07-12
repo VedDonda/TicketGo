@@ -21,7 +21,7 @@ const protect = async (req, res, next) => {
 
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
-    req.user = await User.findById(decoded.id);
+    req.user = await User.findById(decoded.id).lean();
 
     if (!req.user) {
       return res
@@ -64,7 +64,7 @@ const optionalAuth = async (req, res, next) => {
     if (token) {
       const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
-      req.user = await User.findById(decoded.id);
+      req.user = await User.findById(decoded.id).lean();
     }
   } catch (error) {}
 

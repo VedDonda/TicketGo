@@ -1,7 +1,7 @@
 // Admin API service
 import { getToken } from "./authService";
 
-const API_URL = `${import.meta.env.VITE_API_URL || ""}/api/admin`;
+const API_URL = `${import.meta.env.VITE_API_URL || "https://ticketgo-hu5q.onrender.com"}/api/admin`;
 
 export const fetchPendingOrganizers = async () => {
   try {

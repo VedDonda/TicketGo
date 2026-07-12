@@ -4,9 +4,8 @@ import react from '@vitejs/plugin-react';
 export default defineConfig({
   plugins: [react()],
   build: {
-    // Output React build into TicketGo/public/ so Express serves it directly
-    outDir: '../public',
-    emptyOutDir: true, // clean the output folder before each build
+    outDir: 'dist',
+    emptyOutDir: true,
   },
   server: {
     port: 3000,

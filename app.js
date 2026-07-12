@@ -9,20 +9,13 @@ const userRoutes = require("./src/routes/userRoutes");
 const uploadRoutes = require("./src/routes/uploadRoutes");
 const adminRoutes = require("./src/routes/adminRoutes");
 const app = express();
-const rawOrigins = process.env.ALLOWED_ORIGIN || "http://localhost:3000";
-const allowedOrigins = rawOrigins.split(",").map((o) => o.trim());
-
 app.use(
   cors({
-    origin: (origin, callback) => {
-      if (!origin) return callback(null, true);
-      if (allowedOrigins.includes(origin)) return callback(null, true);
-      callback(new Error(`CORS: origin '${origin}' not allowed`));
-    },
+    origin: true,
     credentials: true,
   }),
 );
-app.use(helmet({ contentSecurityPolicy: false }));
+app.use(helmet({ contentSecurityPolicy: false, crossOriginResourcePolicy: false }));
 app.use(express.json({ limit: "20mb" }));
 app.use(express.urlencoded({ limit: "20mb", extended: false }));
 const CLIENT_DIST = path.join(__dirname, "public");

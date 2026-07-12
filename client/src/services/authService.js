@@ -19,7 +19,7 @@ export const clearSession = () => {
 };
 
 // Authentication API service
-const API = `${import.meta.env.VITE_API_URL || ""}/api/auth`;
+const API = `${import.meta.env.VITE_API_URL || "https://ticketgo-hu5q.onrender.com"}/api/auth`;
 
 export const loginRequest = async (email, password) => {
   const res = await fetch(`${API}/login`, {

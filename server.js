@@ -13,10 +13,8 @@ const start = async () => {
   const httpServer = http.createServer(app);
   const io = new Server(httpServer, {
     cors: {
-      origin: (process.env.ALLOWED_ORIGIN || "http://localhost:3000")
-        .split(",")
-        .map((o) => o.trim()),
-      methods: ["GET", "POST"],
+      origin: true, // Automatically reflects the request origin to bypass CORS blocks
+      methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
       credentials: true,
     },
   });

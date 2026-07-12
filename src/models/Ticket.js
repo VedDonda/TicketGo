@@ -55,5 +55,6 @@ ticketSchema.index(
   { unique: true },
 );
 ticketSchema.index({ event: 1, status: 1 });
+ticketSchema.index({ event: 1, status: 1, heldUntil: 1 });
 ticketSchema.index({ bookedBy: 1, event: 1 });
 module.exports = mongoose.model("Ticket", ticketSchema);

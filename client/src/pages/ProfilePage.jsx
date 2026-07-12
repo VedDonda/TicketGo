@@ -14,6 +14,7 @@ import {
   forgotPassword,
   resetPassword,
 } from "../services/userService";
+import { getImageUrl } from "../services/eventService";
 import { fetchMyCreatedEvents } from "../services/eventService";
 const formatPrice = (n) => `₹${Number(n).toLocaleString("en-IN")}`;
 const formatDate = (iso) =>
@@ -38,9 +39,7 @@ const CATEGORY_COLORS = {
   OTHER: { text: "#9ca3af", bg: "rgba(107,114,128,0.1)" },
 };
 const TicketIcon = () => (
-  <svg viewBox="0 0 24 24" fill="white" width="18" height="18">
-    <path d="M22 9V7a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v2a2 2 0 0 1 0 4v2a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-2a2 2 0 0 1 0-4z" />
-  </svg>
+  <img src="/logo.png" alt="TicketGo" style={{ width: 18, height: 18, objectFit: 'contain' }} />
 );
 const UserIcon = () => (
   <svg
@@ -1067,7 +1066,7 @@ export default function ProfilePage() {
                       >
                         {ev.imageUrl ? (
                           <img
-                            src={ev.imageUrl}
+                            src={getImageUrl(ev.imageUrl)}
                             alt=""
                             style={{
                               width: 44,

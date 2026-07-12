@@ -2,7 +2,7 @@
 import { useState, useEffect, useRef } from "react";
 import { Link, useParams, useNavigate } from "react-router-dom";
 import { getCurrentUser, clearSession } from "../services/authService";
-import { fetchEventById } from "../services/eventService";
+import { fetchEventById, uploadImageRequest, updateEventImageRequest, getImageUrl } from "../services/eventService";
 import { fetchMyEventTickets } from "../services/userService";
 const CalIcon = () => (
   <svg
@@ -328,7 +328,7 @@ export default function EventDetail() {
         />
         {event.imageUrl ? (
           <img
-            src={event.imageUrl}
+            src={getImageUrl(event.imageUrl)}
             alt={event.title}
             style={{
               position: "absolute",

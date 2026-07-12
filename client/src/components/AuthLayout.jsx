@@ -1,13 +1,4 @@
-const TicketIcon = () => (
-  <svg
-    className="w-9 h-9"
-    viewBox="0 0 24 24"
-    fill="white"
-    xmlns="http://www.w3.org/2000/svg"
-  >
-    <path d="M22 9V7a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v2a2 2 0 0 1 0 4v2a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-2a2 2 0 0 1 0-4z" />
-  </svg>
-);
+
 const GLOW_COLORS = [
   "from-[#ff9f45]",
   "from-[#c060ff]",
@@ -33,8 +24,8 @@ export default function AuthLayout({ children }) {
         </div>
         <div className="absolute bottom-0 left-0 right-0 z-20 h-[45%] bg-crowd" />
         <div className="relative z-30 px-10 text-center md:-mt-[60px]">
-          <div className="mb-5 inline-flex h-[72px] w-[72px] animate-float items-center justify-center rounded-[20px] border border-white/10 bg-white/10 backdrop-blur-md">
-            <TicketIcon />
+          <div className="mb-5 inline-flex h-[72px] w-[72px] items-center justify-center">
+            <img src="/logo.png" alt="TicketGo" className="w-full h-full object-contain" />
           </div>
           <h2 className="mb-2.5 text-[1.8rem] md:text-[2.4rem] font-extrabold tracking-[-0.5px] text-white">
             TicketGo
