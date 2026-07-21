@@ -1,5 +1,4 @@
 const Event = require("../models/Event");
-// Utility for bulk generating seats
 const Ticket = require("../models/Ticket");
 const Inventory = require("../models/Inventory");
 
@@ -48,7 +47,7 @@ const buildInventoryDocuments = (event) => {
     event: event._id,
     zoneName: zone.zoneName,
     totalSeats: zone.totalSeats,
-    availableSeats: zone.totalSeats,
+    availableSeats: zone.totalSeats,  
     price: zone.price,
     createdAt: now,
     updatedAt: now,

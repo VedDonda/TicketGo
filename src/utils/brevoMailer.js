@@ -1,4 +1,3 @@
-// Email service using Brevo API
 const https = require("https");
 
 const sendOtpEmail = (toEmail, toName, otp) => {

@@ -13,7 +13,7 @@ const start = async () => {
   const httpServer = http.createServer(app);
   const io = new Server(httpServer, {
     cors: {
-      origin: true, // Automatically reflects the request origin to bypass CORS blocks
+      origin: true,
       methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
       credentials: true,
     },

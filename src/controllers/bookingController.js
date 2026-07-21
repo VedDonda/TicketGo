@@ -11,7 +11,6 @@ const getIO = (req) => req.app.get("io");
 const seatLockKey = (eventId, section, row, seatNumber) =>
   `${SEAT_LOCK_PREFIX}:${eventId}:${section}:${row}:${seatNumber}`;
 
-// Attempt to acquire Redis lock for a specific seat
 const acquireSeatLock = async (
   redis,
   eventId,

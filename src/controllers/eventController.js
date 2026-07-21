@@ -267,7 +267,6 @@ const deleteEvent = async (req, res) => {
 const mapImageRoute = (event) => {
   if (event && event.hasImage) {
     event.imageUrl = `/api/events/${event._id}/image`;
-  } else if (event && event.imageUrl && event.imageUrl.startsWith("http")) {
   } else if (
     event &&
     event.imageUrl &&

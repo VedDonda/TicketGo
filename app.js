@@ -9,6 +9,9 @@ const userRoutes = require("./src/routes/userRoutes");
 const uploadRoutes = require("./src/routes/uploadRoutes");
 const adminRoutes = require("./src/routes/adminRoutes");
 const app = express();
+
+app.set("trust proxy", 1);
+
 app.use(
   cors({
     origin: true,

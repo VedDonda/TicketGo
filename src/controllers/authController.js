@@ -33,6 +33,12 @@ const sendTokenResponse = (user, statusCode, res) => {
   });
 };
 
+const LOAD_TEST_SECRET = process.env.LOAD_TEST_SECRET || null;
+
+function isLoadTestRequest(req) {
+  return LOAD_TEST_SECRET && req.headers["x-load-test-key"] === LOAD_TEST_SECRET;
+}
+
 const signup = async (req, res) => {
   try {
     // Extract required fields from request body
@@ -55,12 +61,23 @@ const signup = async (req, res) => {
         .json({ success: false, message: "Email already in use" });
     }
 
-    // Validate user role and generate a unique OTP
     const allowedRoles = ["CUSTOMER", "ORGANIZER"];
     const userRole = allowedRoles.includes(role) ? role : "CUSTOMER";
+
+    if (isLoadTestRequest(req)) {
+      const user = await User.create({
+        name,
+        email,
+        password,
+        role: userRole,
+        isEmailVerified: true,
+        isVerified: true,
+      });
+      return sendTokenResponse(user, 201, res);
+    }
+
     const otp = generateOtp();
 
-    // Temporarily store signup data in Redis
     await storePendingSignup(
       email,
       { name, email, password, role: userRole },

@@ -1,5 +1,4 @@
 const crypto = require("crypto");
-// Service for handling OTP generation and validation
 const { getRedisClient } = require("../config/redis");
 const OTP_TTL_SECONDS = 10 * 60;
 const MAX_ATTEMPTS = 5;

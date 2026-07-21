@@ -20,13 +20,7 @@ const startSeatWorker = (io = null) => {
     "seat-generation",
     async (job) => {
       const { eventId, targetStatus = "PUBLISHED" } = job.data;
-
-      console.log(`[SeatWorker] Processing job ${job.id} — event ${eventId}`);
       const result = await generateSeatsForEvent(eventId, targetStatus);
-
-      console.log(
-        `[SeatWorker] Job ${job.id} done — ${result.insertedCount} records, status → ${targetStatus}`,
-      );
 
       if (io && !result.skipped) {
         io.emit("event:published", {
